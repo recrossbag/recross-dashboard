@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>reCross ダッシュボード マニュアル</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Sans', 'Helvetica Neue', sans-serif; background: #F7F8FA; color: #2D2D2D; font-size: 14px; line-height: 1.7; }
+
+  /* ナビ */
+  .nav { background: #2D2D2D; color: #fff; padding: 0; position: sticky; top: 0; z-index: 100; display: flex; }
+  .nav-title { padding: 14px 24px; font-size: 15px; font-weight: 700; border-right: 1px solid #444; }
+  .nav-tabs { display: flex; }
+  .nav-tab { padding: 14px 20px; font-size: 13px; cursor: pointer; opacity: 0.6; border-bottom: 3px solid transparent; transition: all 0.15s; }
+  .nav-tab:hover { opacity: 0.9; }
+  .nav-tab.active { opacity: 1; border-bottom-color: #FF7043; }
+
+  /* コンテンツ */
+  .page { display: none; max-width: 860px; margin: 0 auto; padding: 32px 24px 60px; }
+  .page.active { display: block; }
+
+  h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 32px; }
+  h3 { font-size: 16px; font-weight: 700; margin: 28px 0 12px; padding-left: 10px; border-left: 4px solid #FF7043; }
+  h4 { font-size: 14px; font-weight: 700; margin: 18px 0 8px; color: #444; }
+  p { margin-bottom: 10px; color: #444; }
+
+  /* ステップカード */
+  .steps { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+  .step { background: #fff; border: 1px solid #E8E8E8; border-radius: 10px; padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start; }
+  .step-num { background: #FF7043; color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .step-body { flex: 1; }
+  .step-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .step-desc { font-size: 13px; color: #666; }
+  .step-tag { display: inline-block; background: #FFF3E0; color: #E65100; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-top: 6px; }
+  .step-tag.csv { background: #E8F5E9; color: #2E7D32; }
+  .step-tag.manual { background: #E3F2FD; color: #1565C0; }
+
+  /* テーブル */
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #E8E8E8; margin-bottom: 20px; font-size: 13px; }
+  th { background: #F5F5F5; padding: 10px 14px; text-align: left; font-weight: 700; color: #555; border-bottom: 1px solid #E8E8E8; }
+  td { padding: 10px 14px; border-bottom: 1px solid #F5F5F5; color: #444; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+
+  /* カード */
+  .card { background: #fff; border: 1px solid #E8E8E8; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+
+  /* メトリクス説明 */
+  .metric { background: #fff; border: 1px solid #E8E8E8; border-radius: 10px; padding: 16px 20px; margin-bottom: 10px; }
+  .metric-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .metric-def { font-size: 13px; color: #666; margin-bottom: 6px; }
+  .metric-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+  .badge.good { background: #E8F5E9; color: #2E7D32; }
+  .badge.warn { background: #FFF3E0; color: #E65100; }
+  .badge.bad  { background: #FFEBEE; color: #C62828; }
+  .badge.info { background: #E3F2FD; color: #1565C0; }
+
+  /* ヒント */
+  .tip { background: #FFF8E1; border-left: 4px solid #FFB300; border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 12px 0; font-size: 13px; color: #5D4037; }
+  .tip strong { color: #E65100; }
+
+  /* カラー凡例 */
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  /* FAQ */
+  .faq { border: 1px solid #E8E8E8; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+  .faq summary { padding: 14px 18px; font-size: 14px; font-weight: 700; cursor: pointer; list-style: none; background: #fff; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::before { content: '＋ '; color: #FF7043; }
+  details[open] summary::before { content: '－ '; }
+  .faq-body { padding: 14px 18px; background: #FAFAFA; font-size: 13px; color: #555; border-top: 1px solid #F0F0F0; }
+
+  @media print {
+    .nav { display: none; }
+    .page { display: block !important; page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-title">📊 reCross マニュアル</div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('ops')">✏️ 操作編</div>
+    <div class="nav-tab" onclick="showPage('view')">📈 数字の見方</div>
+    <div class="nav-tab" onclick="showPage('faq')">❓ よくある質問</div>
+  </div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:16px;">
+    <a href="https://www.rakuten.co.jp/recross001/" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;background:#BF0000;border:1px solid rgba(255,255,255,0.3);border-radius:7px;color:#fff;font-size:12px;font-weight:700;text-decoration:none;" onmouseover="this.style.background='#a00000'" onmouseout="this.style.background='#BF0000'">🛒 楽天ショップを開く</a>
+    <a href="./dashboard.html" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:7px;color:#fff;font-size:12px;font-weight:600;text-decoration:none;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">← ダッシュボードに戻る</a>
+  </div>
+</div>
+
+<!-- ===== 操作編 ===== -->
+<div class="page active" id="page-ops">
+  <h2>✏️ 操作編</h2>
+  <p class="subtitle">楽天担当・データ入力担当向け。2〜3日に1回の作業手順です。</p>
+
+  <h3>基本の流れ</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">楽天店舗データCSVをダウンロード</div>
+        <div class="step-desc">楽天RMS → 6 データダウンロード → 店舗データ → 日次・期間指定 → CSVダウンロード</div>
+        <span class="step-tag csv">📂 CSV取込</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">ダッシュボードで「🛒 楽天店舗データ」ボタンを押してCSVを選択</div>
+        <div class="step-desc">売上・アクセス数が自動で取り込まれます。複数日分まとめてOK。</div>
+        <span class="step-tag csv">自動入力</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Meta広告CSVをダウンロード</div>
+        <div class="step-desc">Meta広告マネージャ → 広告タブ → 内訳 → 時間 → 日 → ダウンロード（↓）</div>
+        <span class="step-tag csv">📂 CSV取込</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">「Meta広告」ボタンを押してCSVを選択</div>
+        <div class="step-desc">CTR・CPC・クリック数・インプレッションが自動で入ります。</div>
+        <span class="step-tag csv">自動入力</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">「📅 IG・サーチ流入をまとめ入力」ボタンから流入数を入力</div>
+        <div class="step-desc">楽天RMS → 3 アクセス・流入分析 → 参照元・検索キーワード分析<br>
+          ・楽天外アクセス：エリアで「楽天市場外」のみONにして確認<br>
+          ・楽天内アクセス：エリアで「楽天市場内」のみONにして確認<br>
+          ・Instagram流入：参照元テーブルのInstagramの数字<br>
+          ・楽天サーチ流入：参照元テーブルの楽天サーチの数字
+        </div>
+        <span class="step-tag manual">✏️ 手動入力</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip">⏰ <strong>入力タイミング：2〜3日に1回</strong>でOKです。楽天イベント（マラソン・スーパーSALE）の直後は忘れずに！</div>
+
+  <h3>カレンダーの使い方</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">カレンダータブを開く</div>
+        <div class="step-desc">楽天セール・クーポン・ポイントアップなどの予定が一覧で見えます。</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">日付をクリック →「＋ イベントを追加」</div>
+        <div class="step-desc">クーポン配布日、ポイントアップ期間、広告開始日などを登録できます。</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">フィルターボタンで種類を絞り込み</div>
+        <div class="step-desc">全体 / 楽天 / クーポン / ポイントアップ / 広告 で切り替えられます。</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>データの取得場所まとめ</h3>
+  <table>
+    <thead>
+      <tr><th>データ</th><th>取得場所</th><th>方法</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>📣 広告（CTR・CPC等）</td>
+        <td>Meta広告マネージャ</td>
+        <td>広告タブ → 内訳 → 日 → CSV <span class="badge csv">CSV</span></td>
+      </tr>
+      <tr>
+        <td>👥 フォロワー増減</td>
+        <td>Meta Business Suite</td>
+        <td>インサイト → オーディエンス → フォロワー数 <span class="badge info">手動</span></td>
+      </tr>
+      <tr>
+        <td>🛒 売上・アクセス数</td>
+        <td>楽天RMS データダウンロード</td>
+        <td>6 データダウンロード → 店舗データ → 日次 <span class="badge csv">CSV</span></td>
+      </tr>
+      <tr>
+        <td>🌐 楽天外・楽天内アクセス<br>📸 Instagram流入<br>🔍 楽天サーチ流入</td>
+        <td>楽天RMS 参照元・検索キーワード分析</td>
+        <td>3 アクセス・流入分析 → 参照元・検索キーワード分析 <span class="badge info">手動</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== 数字の見方編 ===== -->
+<div class="page" id="page-view">
+  <h2>📈 数字の見方</h2>
+  <p class="subtitle">社長・確認者向け。各数字の意味と判断基準です。</p>
+
+  <h3>カラーの見方</h3>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#43A047"></div>緑：良好・目標達成</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#FFB300"></div>黄：注意・改善余地あり</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#E53935"></div>赤：要対応</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#BDBDBD"></div>グレー：データなし</div>
+  </div>
+  <p>KPIカードの右に <span style="color:#43A047;font-weight:700;">▲12%</span> / <span style="color:#E53935;font-weight:700;">▼5%</span> と表示されるのは<strong>前回データとの比較</strong>です。</p>
+
+  <h3>広告（インスタ広告タブ）</h3>
+
+  <div class="metric">
+    <div class="metric-name">📊 CTR（クリック率）</div>
+    <div class="metric-def">広告を見た人のうち、何%がクリックしたか。広告の「訴求力」を示す。</div>
+    <div class="metric-badges">
+      <span class="badge good">✅ 1.5%以上：良好</span>
+      <span class="badge warn">⚠️ 1.0〜1.5%：改善余地あり</span>
+      <span class="badge bad">❌ 1.0%未満：要見直し</span>
+    </div>
+  </div>
+
+  <div class="metric">
+    <div class="metric-name">💰 CPC（クリック単価）</div>
+    <div class="metric-def">1クリックあたりの広告費。低いほど効率的。</div>
+    <div class="metric-badges">
+      <span class="badge good">✅ ¥30以下：良好</span>
+      <span class="badge warn">⚠️ ¥30〜¥40：やや高め</span>
+      <span class="badge bad">❌ ¥40超：高コスト</span>
+    </div>
+  </div>
+
+  <div class="metric">
+    <div class="metric-name">🔁 フリークエンシー（表示頻度）</div>
+    <div class="metric-def">同じ人に何回広告が表示されたか。高すぎると「またこの広告か」と思われ逆効果になる。</div>
+    <div class="metric-badges">
+      <span class="badge good">✅ 2回未満：適切</span>
+      <span class="badge warn">⚠️ 2〜3回：注意</span>
+      <span class="badge bad">❌ 3回超：クリエイティブ更新が必要</span>
+    </div>
+  </div>
+
+  <h3>売上（売上タブ）</h3>
+
+  <div class="metric">
+    <div class="metric-name">💴 売上金額</div>
+    <div class="metric-def">当日の楽天での売上合計。楽天セール・マラソン期間中は大きく上がる傾向がある。</div>
+    <div class="metric-badges">
+      <span class="badge info">楽天RMS 店舗カルテCSVから自動取込</span>
+    </div>
+  </div>
+
+  <div class="metric">
+    <div class="metric-name">📊 転換率（CVR）</div>
+    <div class="metric-def">「売上金額 ÷ アクセス人数」で計算。アクセス1人あたりいくら売れたかを示す。高いほど効率が良い。</div>
+    <div class="metric-badges">
+      <span class="badge good">✅ ¥300/人以上：良好</span>
+      <span class="badge warn">⚠️ ¥100〜¥300/人</span>
+      <span class="badge bad">❌ ¥100未満：アクセスは来ているが買われていない</span>
+    </div>
+  </div>
+
+  <div class="metric">
+    <div class="metric-name">🌐 楽天外アクセス / 🏪 楽天内アクセス</div>
+    <div class="metric-def">
+      楽天外：Instagram・Googleなど楽天の外から来た人数<br>
+      楽天内：楽天のトップページ・サーチ・商品ページなど楽天内から来た人数
+    </div>
+    <div class="metric-badges">
+      <span class="badge info">楽天RMS 参照元・検索キーワード分析から手動入力</span>
+    </div>
+  </div>
+
+  <div class="metric">
+    <div class="metric-name">📸 Instagram→楽天 流入</div>
+    <div class="metric-def">Instagramから楽天に来た人数。インスタ施策の直接効果を示す最重要指標。</div>
+    <div class="metric-badges">
+      <span class="badge good">✅ 月500人以上：目標達成</span>
+      <span class="badge warn">⚠️ 月300〜500人</span>
+      <span class="badge bad">❌ 月300人未満：インスタからの誘導が弱い</span>
+    </div>
+  </div>
+
+  <h3>グラフの見方</h3>
+  <table>
+    <thead>
+      <tr><th>グラフ名</th><th>何を見るか</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>売上推移</td>
+        <td>セール期間との連動を確認。普段と比べてどれだけ売上が上がったか。</td>
+      </tr>
+      <tr>
+        <td>アクセス内訳</td>
+        <td>楽天外・楽天内・Instagramの割合。Instagramが増えれば広告・投稿施策が効いている。</td>
+      </tr>
+      <tr>
+        <td>CTR推移</td>
+        <td>広告の訴求力の変化。下がってきたらクリエイティブの見直しタイミング。</td>
+      </tr>
+      <tr>
+        <td>CPC推移</td>
+        <td>広告の効率の変化。上がってきたらターゲティングや配信設定の見直しが必要。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>レポートの読み方</h3>
+  <div class="card">
+    <div class="card-title">🤖 データからわかること・次にすること</div>
+    <p>レポートの1ページ目にある自動分析セクションです。データをもとに以下の3種類が自動で表示されます。</p>
+    <table>
+      <thead><tr><th>マーク</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td>⚠️ 黄色</td><td>注意が必要な点・改善が必要な指標</td></tr>
+        <tr><td>✅ 緑</td><td>うまくいっている点</td></tr>
+        <tr><td>→ 青</td><td>次にやるべきアクション提案</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tip">📅 <strong>カレンダーと売上の関係を見る</strong>ことが重要です。スーパーSALEやマラソン期間の売上が高い場合、セール依存度が高い可能性があります。平常時の底上げ（定期投稿・広告継続）が中長期の課題です。</div>
+</div>
+
+<!-- ===== FAQ ===== -->
+<div class="page" id="page-faq">
+  <h2>❓ よくある質問</h2>
+  <p class="subtitle">使っていて困ったときはこちら。</p>
+
+  <h3>データ入力について</h3>
+
+  <details class="faq">
+    <summary>CSVを取り込んだのに数字が入らない</summary>
+    <div class="faq-body">
+      ファイルの文字コードや形式が異なる可能性があります。<br>
+      ・Meta広告CSVは「広告」タブ → 内訳 → 時間 → 日 でダウンロードしたものを使ってください<br>
+      ・楽天RMSのCSVは「6 データダウンロード → 店舗データ → 日次」からダウンロードしてください<br>
+      別の画面からダウンロードしたCSVは対応していない場合があります。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>同じ日のデータを取り込んだら数字がおかしくなった</summary>
+    <div class="faq-body">
+      CSVを取り込むと、同じ日付のデータは上書きされます。<br>
+      誤って取り込んだ場合は「履歴」タブから該当日を削除して、正しいデータを再入力してください。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>Instagram流入数はどこで確認できる？</summary>
+    <div class="faq-body">
+      楽天RMS → 3 アクセス・流入分析 → 参照元・検索キーワード分析<br>
+      ページ下部の参照元テーブルに「Instagram」の行があります。アクセス人数の列の数字を入力してください。<br>
+      ※ 日次で見る場合はグラフにカーソルを合わせて確認します。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>楽天外・楽天内アクセスの確認方法がわからない</summary>
+    <div class="faq-body">
+      楽天RMS → 3 アクセス・流入分析 → 参照元・検索キーワード分析<br>
+      「絞り込み」セクションの「エリア」チェックボックスを使います：<br>
+      ・楽天外：「楽天市場外」のみにチェック → 上部のアクセス人数合計<br>
+      ・楽天内：「楽天市場内（店舗内）」「楽天市場内（店舗外）」のみにチェック → 上部のアクセス人数合計
+    </div>
+  </details>
+
+  <h3>表示・操作について</h3>
+
+  <details class="faq">
+    <summary>開いたときにデータが消えている</summary>
+    <div class="faq-body">
+      データはブラウザのlocalStorageに保存されています。<br>
+      ・別のブラウザで開いた場合はデータが見えません<br>
+      ・ブラウザの「閲覧データを削除」をするとデータが消えます<br>
+      必ず同じPC・同じブラウザで開くようにしてください。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>レポートを印刷したい</summary>
+    <div class="faq-body">
+      ページ上部の「📄 出力 → レポートを印刷」ボタンを押すと新しいウィンドウが開きます。<br>
+      ブラウザの印刷機能（Ctrl+P / Cmd+P）でPDFとして保存するか、プリンターで印刷できます。<br>
+      「コメント欄」には印刷前に手書きで補足を記入してください。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>カレンダーにイベントを追加したい</summary>
+    <div class="faq-body">
+      カレンダータブを開く → 日付をクリック → 「＋ イベントを追加」ボタンを押す<br>
+      開始日・終了日・タイトル・カテゴリ（楽天/クーポン/ポイントアップ/広告）・時間・メモを入力して追加できます。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>誤って入力したデータを修正したい</summary>
+    <div class="faq-body">
+      「履歴」タブを開く → 該当日の行の「×」ボタンで削除 → 「データを入力する」ボタンで正しいデータを再入力してください。<br>
+      CSVを再取り込みする場合も同様に削除してから取り込み直してください。
+    </div>
+  </details>
+</div>
+
+<script>
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

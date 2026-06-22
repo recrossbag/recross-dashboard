@@ -1,0 +1,2405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>reCross ダッシュボード</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232D2D2D'/><text x='16' y='23' font-size='18' text-anchor='middle'>🤖</text></svg>">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Hiragino Sans', 'Helvetica Neue', sans-serif; background: #F7F7F5; color: #2D2D2D; font-size: 14px; }
+
+    /* ── Header ── */
+    header { background: #2D2D2D; color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.05em; }
+    header span { font-size: 12px; color: #aaa; }
+
+    /* ── Layout ── */
+    .container { max-width: 960px; margin: 0 auto; padding: 20px 16px; }
+
+    /* ── Section title ── */
+    .section-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #888; text-transform: uppercase; margin-bottom: 10px; margin-top: 28px; }
+
+    /* ── Action cards ── */
+    .action-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    .action-card { border-radius: 10px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+    .action-card.red    { background: #FFF0F0; border-left: 4px solid #E57373; }
+    .action-card.orange { background: #FFF8F0; border-left: 4px solid #FFB74D; }
+    .action-card.blue   { background: #F0F4FF; border-left: 4px solid #7986CB; }
+    .action-card.green  { background: #F0FFF4; border-left: 4px solid #66BB6A; }
+    .action-card.gray   { background: #F5F5F5; border-left: 4px solid #BDBDBD; }
+    .action-icon { font-size: 20px; flex-shrink: 0; }
+    .action-body { flex: 1; }
+    .action-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+    .action-desc  { font-size: 12px; color: #666; line-height: 1.5; }
+
+    /* ── Entry button ── */
+    .entry-btn { background: #2D2D2D; color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+    .entry-btn:hover { background: #444; }
+
+    /* ── Modal ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 540px; padding: 28px; margin: auto; }
+    .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+    .modal-section { margin-bottom: 20px; }
+    .modal-section h3 { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #888; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-item label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; font-weight: 600; }
+    .form-item input { width: 100%; border: 1px solid #E0E0E0; border-radius: 6px; padding: 8px 10px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+    .form-item input:focus { border-color: #2D2D2D; }
+    .form-item .unit { font-size: 11px; color: #aaa; margin-top: 2px; }
+    .date-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .date-row label { font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .date-row input { border: 1px solid #E0E0E0; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn-cancel { background: #F5F5F5; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; cursor: pointer; }
+    .btn-save   { background: #2D2D2D; color: #fff; border: none; border-radius: 8px; padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 4px; border-bottom: 2px solid #E0E0E0; margin-bottom: 20px; margin-top: 28px; }
+    .tab { padding: 10px 18px; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s; }
+    .tab.active { color: #2D2D2D; border-bottom-color: #2D2D2D; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── KPI row ── */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .kpi-card { background: #fff; border-radius: 10px; padding: 14px 16px; border: 1px solid #EBEBEB; overflow: hidden; }
+    .kpi-label { font-size: 11px; color: #888; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi-value { font-size: 20px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi-period { font-size: 12px; color: #888; font-weight: 600; margin-bottom: 8px; }
+    .kpi-target { font-size: 11px; color: #aaa; margin-top: 4px; }
+    .kpi-card.ok   .kpi-value { color: #43A047; }
+    .kpi-card.warn .kpi-value { color: #FB8C00; }
+    .kpi-card.bad  .kpi-value { color: #E53935; }
+    .kpi-card.na   .kpi-value { color: #BDBDBD; }
+
+    /* ── Chart ── */
+    .chart-wrap { background: #fff; border-radius: 12px; border: 1px solid #EBEBEB; padding: 20px; margin-bottom: 16px; }
+    .chart-wrap h3 { font-size: 13px; font-weight: 700; margin-bottom: 16px; }
+
+    /* ── History ── */
+    .history-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #EBEBEB; }
+    .history-table th { background: #F5F5F5; font-size: 11px; font-weight: 700; color: #888; padding: 10px 12px; text-align: left; }
+    .history-table td { padding: 10px 12px; border-top: 1px solid #F0F0F0; font-size: 13px; }
+    .history-table tr:hover td { background: #FAFAFA; }
+    .del-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; padding: 0; }
+    .del-btn:hover { color: #E53935; }
+
+    /* ── Events ── */
+    .event-list { display: flex; flex-direction: column; gap: 8px; }
+    .event-item { background: #fff; border-radius: 8px; border: 1px solid #EBEBEB; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+    .event-date { font-size: 12px; font-weight: 700; color: #7986CB; white-space: nowrap; }
+    .event-name { font-size: 13px; flex: 1; }
+    .event-days { font-size: 11px; color: #aaa; white-space: nowrap; }
+    .event-del  { background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; }
+    .event-del:hover { color: #E53935; }
+    .add-event-row { display: flex; gap: 8px; margin-top: 10px; }
+    .add-event-row input { flex: 1; border: 1px solid #E0E0E0; border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+    .add-event-btn { background: #2D2D2D; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+
+    .empty { color: #BDBDBD; font-size: 13px; padding: 12px 0; }
+
+    /* ── Calendar ── */
+    .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .cal-month-label { font-size:16px; font-weight:700; }
+    .cal-nav-btn { background:#F5F5F5; border:none; border-radius:6px; padding:6px 16px; font-size:14px; cursor:pointer; }
+    .cal-nav-btn:hover { background:#E0E0E0; }
+    .cal-filter-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+    .cal-filter-btn { border:1px solid #E0E0E0; background:#fff; border-radius:20px; padding:5px 14px; font-size:12px; font-weight:600; cursor:pointer; }
+    .cal-filter-btn.active { background:#2D2D2D; color:#fff; border-color:#2D2D2D; }
+    .cal-legend { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .cal-legend-item { display:flex; align-items:center; gap:4px; font-size:11px; color:#666; }
+    .cal-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:0; border-bottom:1px solid #EBEBEB; }
+    .cal-dow { text-align:center; font-size:11px; font-weight:700; color:#888; padding:6px 0; }
+    .cal-dow.sun { color:#E53935; } .cal-dow.sat { color:#1565C0; }
+    .cal-week-block { border-top:1px solid #EBEBEB; background:#fff; }
+    .cal-week-block:last-child { border-bottom:1px solid #EBEBEB; }
+    .cal-bars-row { padding:3px 0 5px; background:#fff; }
+    #cal-weeks { background:#fff; }
+    #tab-calendar { background:#fff; }
+    .cal-event-bar { font-size:10px; font-weight:700; color:#fff; line-height:20px; height:20px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; cursor:pointer; margin:1px 0; border-radius:0; padding:0 2px; }
+    .cal-event-bar:hover { filter:brightness(1.1); }
+    .cal-event-bar.bar-start { border-top-left-radius:10px; border-bottom-left-radius:10px; margin-left:4px; padding-left:7px; }
+    .cal-event-bar.bar-end   { border-top-right-radius:10px; border-bottom-right-radius:10px; margin-right:4px; }
+    .cal-day { min-height:34px; padding:5px 4px 2px; background:#fff; cursor:pointer; transition:background 0.1s; }
+    .cal-day:hover { background:#F9F9F9; }
+    .cal-day.other-month { background:#fff; }
+    .cal-day.other-month .cal-day-num { color:#BDBDBD; }
+    .cal-day.selected .cal-day-num-wrap { background:#EEF2FF; border-radius:50%; }
+    .cal-day-num-wrap { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; }
+    .cal-day-num { font-size:12px; font-weight:600; }
+    .cal-day.today .cal-day-num-wrap { background:#2D2D2D; border-radius:50%; }
+    .cal-day.today .cal-day-num { color:#fff; }
+    .cal-day-num.sun { color:#E53935; } .cal-day-num.sat { color:#1565C0; }
+    .cal-day.today .cal-day-num.sun, .cal-day.today .cal-day-num.sat { color:#fff; }
+    .cal-detail { margin-top:14px; background:#fff; border:1px solid #EBEBEB; border-radius:10px; padding:14px; }
+    .cal-detail h3 { font-size:13px; font-weight:700; margin-bottom:10px; }
+    .cal-detail-event { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #F5F5F5; }
+    .cal-detail-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .cal-detail-title { font-size:13px; flex:1; }
+    .cal-detail-range { font-size:10px; color:#aaa; }
+    .cal-detail-del { background:none; border:none; color:#ccc; cursor:pointer; font-size:16px; }
+    .cal-detail-del:hover { color:#E53935; }
+    .cal-add-btn { margin-top:10px; background:#F5F5F5; border:none; border-radius:6px; padding:8px 16px; font-size:12px; font-weight:600; cursor:pointer; }
+    .cal-add-btn:hover { background:#E0E0E0; }
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 20px; background: #E0E0E0; color: #666; margin-left: 6px; }
+    .badge.soon { background: #FFB74D; color: #fff; }
+    .badge.today { background: #E53935; color: #fff; }
+    .chart-period-bar { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+    .chart-period-btn { border:1px solid #E0E0E0; background:#fff; border-radius:20px; padding:5px 14px; font-size:12px; font-weight:600; cursor:pointer; }
+    .chart-period-btn.active { background:#2D2D2D; color:#fff; border-color:#2D2D2D; }
+
+    /* ── View toggle (カレンダー / ガント) ── */
+    .cal-view-toggle { display:inline-flex; background:#F0F0F0; border-radius:8px; padding:3px; gap:3px; margin-bottom:14px; }
+    .cal-view-btn { border:none; background:transparent; border-radius:6px; padding:6px 16px; font-size:12px; font-weight:700; color:#888; cursor:pointer; transition:all 0.15s; }
+    .cal-view-btn.active { background:#fff; color:#2D2D2D; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+
+    /* ── Gantt ── */
+    .gantt-wrap { background:#fff; border:1px solid #EBEBEB; border-radius:12px; overflow:hidden; }
+    .gantt-scroll { overflow-x:auto; }
+    .gantt-inner { min-width:max-content; }
+    .gantt-row { display:flex; border-top:1px solid #F0F0F0; }
+    .gantt-row:first-child { border-top:none; }
+    .gantt-head { background:#FAFAFA; }
+    .gantt-label-col { width:150px; min-width:150px; flex-shrink:0; padding:0 10px; font-size:11px; line-height:1.2; display:flex; align-items:center; gap:5px; border-right:2px solid #E8E8E8; background:#fff; position:sticky; left:0; z-index:2; }
+    .gantt-label-col.indent { left:34px; }
+    .gantt-head .gantt-label-col { background:#FAFAFA; font-weight:700; color:#888; font-size:11px; padding:6px 10px; }
+    .gantt-label-dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+    .gantt-label-txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gantt-cell { width:26px; min-width:26px; flex-shrink:0; text-align:center; font-size:10px; color:#aaa; padding:4px 0; border-left:1px solid #F5F5F5; box-sizing:border-box; }
+    .gantt-cell.sun { color:#E53935; background:#FFF6F6; }
+    .gantt-cell.sat { color:#1565C0; background:#F4F8FF; }
+    .gantt-cell.today { background:#FFF8E1; }
+    .gantt-cell .g-dow { font-size:8px; display:block; color:#bbb; }
+    .gantt-track { display:flex; position:relative; flex:1; }
+    .gantt-track .gantt-cell { padding:0; height:16px; }
+    .gantt-bar { position:absolute; top:1px; height:14px; border-radius:3px; color:#fff; font-size:9px; font-weight:700; line-height:14px; padding:0 5px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.15); }
+    /* 縦書きカテゴリ見出し */
+    .gantt-cat-block { display:flex; border-top:2px solid #E0E0E0; }
+    .gantt-cat-vlabel { width:34px; min-width:34px; flex-shrink:0; writing-mode:vertical-rl; text-orientation:upright; display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:700; color:#555; letter-spacing:0.08em; background:#F5F5F5; border-right:1px solid #E8E8E8; position:sticky; left:0; z-index:3; padding:6px 0; cursor:pointer; user-select:none; }
+    .gantt-cat-vlabel:hover { background:#ECECEC; }
+    .gantt-cat-caret { writing-mode:horizontal-tb; font-size:11px; color:#999; }
+    .gantt-cat-vlabel .gantt-label-dot { width:8px; height:8px; }
+    .gantt-cat-events { flex:1; min-width:0; }
+    /* 折りたたみ時のコンパクト行 */
+    .gantt-cat-collapsed { background:#F5F5F5; border-top:2px solid #E0E0E0; cursor:pointer; }
+    .gantt-cat-collapsed:hover { background:#ECECEC; }
+    .gantt-cat-collapsed .gantt-label-col { background:transparent; font-weight:700; color:#666; }
+    /* 月ラベル行・月境界 */
+    .gantt-month-row { display:flex; background:#FAFAFA; border-bottom:1px solid #EBEBEB; }
+    .gantt-month-cell { flex-shrink:0; font-size:11px; font-weight:700; color:#555; padding:4px 0 4px 6px; border-left:2px solid #D8D8D8; box-sizing:border-box; white-space:nowrap; overflow:hidden; }
+    .gantt-month-cell:first-child { border-left:none; }
+    .gantt-cell.month-start { border-left:2px solid #D8D8D8; }
+    /* 件数ヒートマップ行 */
+    .gantt-density-row { background:#fff; border-bottom:1px solid #EBEBEB; }
+    .gantt-density-row .gantt-label-col { font-size:10px; font-weight:700; color:#888; }
+    .gantt-density-row .gantt-cell { height:16px; line-height:16px; font-size:9px; font-weight:700; color:#3a4a8c; }
+    .gantt-bar:hover { filter:brightness(1.08); }
+    .gantt-sort-btns { display:none; flex-direction:column; gap:0; margin-left:auto; flex-shrink:0; }
+    .gantt-row:hover .gantt-sort-btns,
+    .gantt-cat-events .gantt-row:hover .gantt-sort-btns { display:flex; }
+    .gantt-sort-btn { background:none; border:none; cursor:pointer; font-size:9px; color:#bbb; padding:0 2px; line-height:1; }
+    .gantt-sort-btn:hover { color:#555; }
+    .gantt-empty { padding:30px; text-align:center; color:#BDBDBD; font-size:13px; }
+    .gantt-month-label { font-size:16px; font-weight:700; }
+    .gantt-group-row { display:flex; background:#F5F5F5; border-top:2px solid #E0E0E0; }
+    .gantt-group-row:first-child { border-top:none; }
+    .gantt-group-label { width:150px; min-width:150px; flex-shrink:0; padding:7px 12px; font-size:12px; font-weight:700; color:#555; border-right:2px solid #E8E8E8; background:#F5F5F5; position:sticky; left:0; z-index:2; display:flex; align-items:center; gap:6px; }
+    .gantt-group-fill { flex:1; background:#F5F5F5; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>reCross 管理ダッシュボード</h1>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+      <span id="today-label" style="font-size:12px;"></span>
+      <span id="last-updated-label" style="font-size:11px;color:#aaa;"></span>
+    </div>
+    <a href="./manual.html" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">📖 マニュアル</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+    <!-- 手動入力グループ -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.05em;min-width:60px;">✏️ 手動入力</span>
+      <button class="entry-btn" onclick="openModal()" style="margin-top:0;">
+        データを入力する
+      </button>
+      <button class="entry-btn" onclick="openIgModal()" style="margin-top:0;background:#E64A19;">
+        📅 IG・サーチ流入をまとめ入力
+      </button>
+    </div>
+    <!-- CSVグループ -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.05em;min-width:60px;">📂 CSV取込</span>
+      <button class="entry-btn" onclick="document.getElementById('csv-input').click()" style="margin-top:0;background:#555;">
+        Meta広告
+      </button>
+      <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
+      <button class="entry-btn" onclick="document.getElementById('rakuten-csv-input').click()" style="margin-top:0;background:#BF0000;">
+        🛒 楽天店舗データ
+      </button>
+      <input type="file" id="rakuten-csv-input" accept=".csv" style="display:none" onchange="importRakutenCSV(this)">
+    </div>
+    <!-- レポートグループ -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.05em;min-width:60px;">📄 出力</span>
+      <button class="entry-btn" onclick="openReport()" style="margin-top:0;background:#37474F;">
+        レポートを印刷
+      </button>
+    </div>
+  </div>
+
+  <!-- データ取得ガイド -->
+  <details style="margin-top:14px;background:#fff;border:1px solid #EBEBEB;border-radius:10px;overflow:hidden;">
+    <summary style="padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+      📋 どこからデータを取るか <span style="font-size:11px;color:#aaa;font-weight:400;">（クリックで開く）</span>
+    </summary>
+    <div style="padding:0 16px 16px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid #F0F0F0;">
+            <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;width:30%;">データ</th>
+            <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;width:35%;">取得場所</th>
+            <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;">出し方</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #F5F5F5;">
+            <td style="padding:8px 6px;font-weight:600;">📣 広告（CTR・CPC等）</td>
+            <td style="padding:8px 6px;">Meta広告マネージャ</td>
+            <td style="padding:8px 6px;color:#555;">「広告」タブ →「内訳」→「時間」→「日」→ ダウンロード（↓）<br><span style="color:#7986CB;font-weight:600;">→ そのままCSV取り込みボタンでOK</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid #F5F5F5;">
+            <td style="padding:8px 6px;font-weight:600;">👥 フォロワー増減</td>
+            <td style="padding:8px 6px;">Meta Business Suite</td>
+            <td style="padding:8px 6px;color:#555;">「インサイト」→「オーディエンス」→ フォロワー数の増減を手入力</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F5F5F5;">
+            <td style="padding:8px 6px;font-weight:600;">🛒 売上・楽天流入</td>
+            <td style="padding:8px 6px;">楽天RMS データダウンロード</td>
+            <td style="padding:8px 6px;color:#555;">「6 データダウンロード」→「店舗データ」→ 日次・期間選択 → CSVダウンロード<br><span style="color:#BF0000;font-weight:600;">→ 楽天店舗データCSV取り込みボタンでOK</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px;padding:10px 12px;background:#F0F4FF;border-radius:8px;font-size:12px;color:#555;line-height:1.7;">
+        ⏰ <strong>入力タイミング：2〜3日に1回</strong>でOK。広告はCSV、売上・アクセスは手入力が基本。
+      </div>
+    </div>
+  </details>
+
+  <!-- ② 予定 -->
+  <div class="section-title">今後の予定</div>
+  <div class="event-list" id="event-list"></div>
+
+  <!-- ③ データタブ -->
+  <div class="tabs">
+    <div class="tab" onclick="switchTab('calendar')">📅 カレンダー</div>
+    <div class="tab active" onclick="switchTab('sales')">🛒 売上・アクセス</div>
+    <div class="tab" onclick="switchTab('ad')">📣 インスタ広告</div>
+    <div class="tab" onclick="switchTab('history')">📋 履歴</div>
+  </div>
+
+  <!-- チャート期間切替 -->
+  <div class="chart-period-bar" id="chart-period-bar">
+    <button class="chart-period-btn active" data-p="all" onclick="setChartPeriod('all')">全期間</button>
+    <button class="chart-period-btn" data-p="month" onclick="setChartPeriod('month')">月別</button>
+    <button class="chart-period-btn" data-p="30" onclick="setChartPeriod(30)">直近30件</button>
+    <button class="chart-period-btn" data-p="10" onclick="setChartPeriod(10)">直近10件</button>
+    <button class="chart-period-btn" data-p="range" onclick="setChartPeriod('range')">📅 日付指定</button>
+  </div>
+  <!-- 日付指定スライダー -->
+  <div id="chart-range-bar" style="display:none;background:#fff;border:1px solid #EBEBEB;border-radius:10px;padding:14px 16px;margin-bottom:14px;">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label style="font-size:12px;font-weight:600;color:#888;">開始</label>
+        <input type="date" id="range-start" oninput="renderCharts(); renderKPIs(); if(typeof calView!=='undefined'&&calView==='gantt') renderGantt();" style="border:1px solid #E0E0E0;border-radius:6px;padding:5px 8px;font-size:13px;">
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label style="font-size:12px;font-weight:600;color:#888;">終了</label>
+        <input type="date" id="range-end" oninput="renderCharts(); renderKPIs(); if(typeof calView!=='undefined'&&calView==='gantt') renderGantt();" style="border:1px solid #E0E0E0;border-radius:6px;padding:5px 8px;font-size:13px;">
+      </div>
+      <span id="range-count" style="font-size:12px;color:#aaa;"></span>
+    </div>
+  </div>
+
+  <!-- 広告タブ -->
+  <div class="tab-content" id="tab-ad">
+    <div class="kpi-period" id="kpi-ad-period"></div>
+    <div class="kpi-row" id="kpi-ad"></div>
+    <div class="chart-wrap">
+      <h3>CTR推移（目標：1.5%）</h3>
+      <canvas id="chart-ctr" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>CPC推移（目標：¥30以下）</h3>
+      <canvas id="chart-cpc" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>クリック数・インプレッション</h3>
+      <canvas id="chart-clicks" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- 売上タブ -->
+  <div class="tab-content active" id="tab-sales">
+    <div class="kpi-period" id="kpi-sales-period"></div>
+    <div class="kpi-row" id="kpi-sales"></div>
+    <div class="chart-wrap">
+      <h3>売上推移</h3>
+      <canvas id="chart-sales" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>楽天アクセス・流入推移</h3>
+      <canvas id="chart-visitors" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>アクセス内訳（楽天外 / 楽天内 / Instagram）</h3>
+      <canvas id="chart-access-breakdown" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- カレンダータブ -->
+  <div class="tab-content" id="tab-calendar">
+    <div class="cal-view-toggle">
+      <button class="cal-view-btn" id="view-btn-calendar" onclick="setCalView('calendar')">📅 カレンダー</button>
+      <button class="cal-view-btn active" id="view-btn-gantt" onclick="setCalView('gantt')">📊 ガントチャート</button>
+    </div>
+    <div class="cal-filter-row" id="cal-filter-row">
+      <button class="cal-filter-btn active" data-cat="all" onclick="setCalFilter('all')">🗓 全体</button>
+      <button class="cal-filter-btn" data-cat="rakuten" onclick="setCalFilter('rakuten')">🛒 楽天</button>
+      <button class="cal-filter-btn" data-cat="coupon" onclick="setCalFilter('coupon')">🎫 クーポン</button>
+      <button class="cal-filter-btn" data-cat="point" onclick="setCalFilter('point')">⭐ ポイントアップ</button>
+      <button class="cal-filter-btn" data-cat="ad" onclick="setCalFilter('ad')">📣 広告</button>
+    </div>
+    <div class="cal-legend" id="cal-legend">
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#BF0000"></div>楽天セール</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FFB300"></div>ご愛顧感謝デー</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#0050B3"></div>マラソン</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#E60012"></div>楽天カード日</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#43A047"></div>クーポン</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#8E24AA"></div>ポイントアップ</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#F57C00"></div>広告</div>
+    </div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="changeCalMonth(-1)">◀</button>
+      <span class="cal-month-label" id="cal-month-label"></span>
+      <button class="cal-nav-btn" onclick="changeCalMonth(1)">▶</button>
+    </div>
+
+    <!-- カレンダービュー -->
+    <div id="calendar-view" style="display:none;">
+      <div class="cal-grid" id="cal-grid">
+        <div class="cal-dow sun">日</div>
+        <div class="cal-dow">月</div>
+        <div class="cal-dow">火</div>
+        <div class="cal-dow">水</div>
+        <div class="cal-dow">木</div>
+        <div class="cal-dow">金</div>
+        <div class="cal-dow sat">土</div>
+      </div>
+      <div id="cal-weeks"></div>
+      <div class="cal-detail" id="cal-detail" style="display:none;">
+        <h3 id="cal-detail-date"></h3>
+        <div id="cal-detail-events"></div>
+        <button class="cal-add-btn" onclick="openCalAddModal()">＋ イベントを追加</button>
+      </div>
+    </div>
+
+    <!-- ガントチャートビュー -->
+    <div id="gantt-view">
+      <div class="gantt-wrap">
+        <div class="gantt-scroll">
+          <div class="gantt-inner" id="gantt-inner"></div>
+        </div>
+      </div>
+      <button class="cal-add-btn" onclick="openCalAddModal()" style="margin-top:12px;">＋ イベントを追加</button>
+    </div>
+  </div>
+
+  <!-- 履歴タブ -->
+  <div class="tab-content" id="tab-history">
+    <div style="overflow-x:auto;">
+      <table class="history-table" id="history-table">
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>CTR</th><th>CPC</th><th>クリック</th><th>頻度</th>
+            <th>リーチ</th><th>エンゲ率</th><th>フォロワー±</th>
+            <th>売上</th><th>全体流入</th><th>IG流入</th><th>サーチ流入</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ぴょこぴょこロボ -->
+<div id="robo-wrap" style="position:fixed;bottom:24px;right:24px;z-index:200;cursor:pointer;user-select:none;" onclick="roboTalk()" title="クリックしてね">
+  <div id="robo-bubble" style="display:none;position:absolute;bottom:80px;right:0;background:#2D2D2D;color:#fff;font-size:12px;font-weight:600;padding:8px 12px;border-radius:10px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+    <span id="robo-text"></span>
+    <div style="position:absolute;bottom:-6px;right:18px;width:10px;height:10px;background:#2D2D2D;transform:rotate(45deg);"></div>
+  </div>
+  <div id="robo" style="font-size:42px;animation:roboBounce 1.8s ease-in-out infinite;">🤖</div>
+</div>
+<style>
+  @keyframes roboBounce {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-10px); }
+  }
+  @keyframes roboWiggle {
+    0%,100% { transform: rotate(0deg); }
+    25%     { transform: rotate(-15deg); }
+    75%     { transform: rotate(15deg); }
+  }
+</style>
+<script>
+const roboLines = [
+  'データ入力、忘れずに！📊',
+  'CTR確認しましたか？🎯',
+  '売上グラフ、右肩上がり目指そう📈',
+  '楽天マラソン、準備はOK？🏃',
+  'クーポン設定、確認した？🎫',
+  '広告予算、チェックしよう💰',
+  'Instagram流入、増えてる？📸',
+  'お疲れさまです！☕',
+];
+let roboTimer;
+function roboTalk() {
+  const bubble = document.getElementById('robo-bubble');
+  const text   = document.getElementById('robo-text');
+  const robo   = document.getElementById('robo');
+  text.textContent = roboLines[Math.floor(Math.random() * roboLines.length)];
+  bubble.style.display = 'block';
+  robo.style.animation = 'roboWiggle 0.4s ease-in-out 3';
+  clearTimeout(roboTimer);
+  roboTimer = setTimeout(() => {
+    bubble.style.display = 'none';
+    robo.style.animation = 'roboBounce 1.8s ease-in-out infinite';
+  }, 3000);
+}
+</script>
+
+<!-- IG流入まとめ入力モーダル -->
+<div class="modal-overlay" id="ig-modal">
+  <div class="modal">
+    <h2>📅 アクセス・流入まとめ入力</h2>
+    <p style="font-size:11px;color:#888;margin-bottom:4px;">楽天RMS「参照元・検索キーワード分析」→ エリアを切り替えて確認</p>
+    <div style="font-size:10px;color:#aaa;margin-bottom:10px;line-height:1.6;">
+      楽天外：エリア「楽天市場外」のみON ／ 楽天内：エリア「楽天市場内」のみON ／ IG・サーチ：参照元テーブルの数字
+    </div>
+    <div style="display:grid;grid-template-columns:64px 1fr 1fr 1fr 1fr;gap:4px;margin-bottom:6px;font-size:10px;font-weight:700;color:#888;text-align:center;">
+      <div style="text-align:left;">日付</div>
+      <div>🌐 楽天外</div>
+      <div>🏪 楽天内</div>
+      <div>📸 Instagram</div>
+      <div>🔍 サーチ</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+      <label style="font-size:12px;font-weight:700;white-space:nowrap;">表示日数</label>
+      <select id="ig-days-select" onchange="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 10px;font-size:13px;">
+        <option value="3">直近3日</option>
+        <option value="5">直近5日</option>
+        <option value="7" selected>直近7日</option>
+        <option value="14">直近14日</option>
+      </select>
+    </div>
+    <div id="ig-rows"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeIgModal()">キャンセル</button>
+      <button class="btn-save" onclick="saveIgEntries()">まとめて保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- モーダル -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>データ入力</h2>
+    <div class="date-row">
+      <label>日付</label>
+      <input type="date" id="entry-date">
+    </div>
+
+    <div class="modal-section">
+      <h3>📣 広告（Meta広告マネージャ）</h3>
+      <div class="form-grid">
+        <div class="form-item">
+          <label>CTR（クリック率）</label>
+          <input type="number" id="f-ctr" step="0.01" placeholder="例：1.8">
+          <div class="unit">% ／ 目標 1.5%以上</div>
+        </div>
+        <div class="form-item">
+          <label>CPC（クリック単価）</label>
+          <input type="number" id="f-cpc" step="1" placeholder="例：25">
+          <div class="unit">円 ／ 目標 ¥30以下</div>
+        </div>
+        <div class="form-item">
+          <label>クリック数</label>
+          <input type="number" id="f-clicks" placeholder="例：320">
+          <div class="unit">回</div>
+        </div>
+        <div class="form-item">
+          <label>インプレッション</label>
+          <input type="number" id="f-ad-imp" placeholder="例：18000">
+          <div class="unit">回</div>
+        </div>
+        <div class="form-item">
+          <label>消化予算</label>
+          <input type="number" id="f-budget" placeholder="例：3000">
+          <div class="unit">円</div>
+        </div>
+        <div class="form-item">
+          <label>フリークエンシー</label>
+          <input type="number" id="f-freq" step="0.1" placeholder="例：2.1">
+          <div class="unit">回 ／ 3超えで広告疲労</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>🛒 売上（楽天店舗カルテ）</h3>
+      <div class="form-grid">
+        <div class="form-item">
+          <label>売上金額</label>
+          <input type="number" id="f-sales" placeholder="例：120000">
+          <div class="unit">円</div>
+        </div>
+        <div class="form-item">
+          <label>楽天 全体アクセス人数</label>
+          <input type="number" id="f-visitors" placeholder="例：500">
+          <div class="unit">人（CSVから自動入力）</div>
+        </div>
+        <div class="form-item">
+          <label>Instagram→楽天 流入数</label>
+          <input type="number" id="f-ig-visitors" placeholder="例：120">
+          <div class="unit">人 ／ 目標 月500人<br>📍 楽天RMS「参照元・検索キーワード分析」→ Instagram の人数</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn-save" onclick="saveEntry()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- カレンダー イベント追加モーダル -->
+<div class="modal-overlay" id="cal-modal">
+  <div class="modal">
+    <h2>📅 イベントを追加</h2>
+    <div class="date-row">
+      <label>開始日</label>
+      <input type="date" id="cal-ev-start" style="flex:1;">
+      <input type="time" id="cal-ev-time-start" style="width:108px;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:13px;">
+    </div>
+    <div class="date-row">
+      <label>終了日</label>
+      <input type="date" id="cal-ev-end" style="flex:1;">
+      <input type="time" id="cal-ev-time-end" style="width:108px;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:13px;">
+    </div>
+    <div class="date-row">
+      <label>タイトル</label>
+      <input type="text" id="cal-ev-title" list="cal-title-datalist" placeholder="例：スーパーSALE" autocomplete="off" style="border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:13px;flex:1;">
+      <datalist id="cal-title-datalist"></datalist>
+    </div>
+    <div class="date-row">
+      <label>カテゴリ</label>
+      <select id="cal-ev-cat" style="border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:13px;flex:1;">
+        <option value="rakuten">🛒 楽天</option>
+        <option value="coupon">🎫 クーポン</option>
+        <option value="point">⭐ ポイントアップ</option>
+        <option value="ad">📣 広告</option>
+      </select>
+    </div>
+    <div class="date-row">
+      <label>メモ</label>
+      <input type="text" id="cal-ev-note" placeholder="例：全商品10%OFF" style="border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:13px;flex:1;">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeCalModal()">キャンセル</button>
+      <button class="btn-save" onclick="saveCalEvent()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// Firebase 設定・データ管理
+// ─────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAKdzWGn9542lPUpN7-jmHGGU_WlENMV58",
+  authDomain: "recross-dashboard.firebaseapp.com",
+  projectId: "recross-dashboard",
+  storageBucket: "recross-dashboard.firebasestorage.app",
+  messagingSenderId: "905935191675",
+  appId: "1:905935191675:web:1fab16ea88ea9ad9df6cde",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DATA_DOC = db.collection('dashboard').doc('main');
+
+let entries = [];
+let events  = [];
+let calEventsCache = [];
+let charts  = {};
+let dbReady = false;
+
+function saveEntries(arr) {
+  entries = arr;
+  DATA_DOC.set({ entries: arr }, { merge: true });
+}
+function saveEvents(arr) {
+  events = arr;
+  DATA_DOC.set({ events: arr }, { merge: true });
+}
+
+// Firestore リアルタイムリスナー
+DATA_DOC.onSnapshot(doc => {
+  const data = doc.data();
+  if (!data) {
+    seedAndSave();
+    return;
+  }
+  entries        = data.entries        || [];
+  events         = data.events         || [];
+  calEventsCache = data.calEvents      || [];
+  // 自動修復：日付フォーマット重複・空行を一度だけ整理（修復不要なら何もしない＝ループしない）
+  if (needsEntryRepair(entries)) {
+    entries = dedupeEntries(entries)
+      .filter(en => !isEmptyEntry(en))
+      .sort((a,b) => a.date.localeCompare(b.date));
+    saveEntries(entries);
+  }
+  if (!dbReady) {
+    dbReady = true;
+    init();
+  } else {
+    renderAll();
+    renderCalendar();
+  }
+});
+
+// ─────────────────────────────────────────────
+// 初期化
+// ─────────────────────────────────────────────
+
+function init() {
+  // 今日の日付
+  const today = new Date();
+  document.getElementById('today-label').textContent =
+    today.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+  // 最終更新日
+  const lastEntry = entries.length ? entries[entries.length - 1] : null;
+  const luEl = document.getElementById('last-updated-label');
+  if (lastEntry) {
+    const diff = Math.floor((today - new Date(lastEntry.date)) / 86400000);
+    luEl.textContent = `最終更新：${lastEntry.date}（${diff === 0 ? '今日' : diff + '日前'}）`;
+    luEl.style.color = diff > 3 ? '#E53935' : '#aaa';
+  } else {
+    luEl.textContent = 'データ未入力';
+  }
+
+  // モーダルのデフォルト日付
+  document.getElementById('entry-date').value = toDateStr(today);
+
+  renderEvents();
+  renderKPIs();
+  renderCharts();
+  renderHistory();
+  initCalendar();
+}
+
+// ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────
+// 予定
+// ─────────────────────────────────────────────
+function renderEvents() {
+  const list = document.getElementById('event-list');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
+
+  list.innerHTML = '';
+  if (sorted.length === 0) {
+    list.innerHTML = '<div class="empty">予定はありません</div>';
+    return;
+  }
+  sorted.forEach(ev => {
+    const evDate = new Date(ev.date); evDate.setHours(0,0,0,0);
+    const diff = Math.floor((evDate - today) / 86400000);
+    let badge = '';
+    if (diff === 0) badge = '<span class="badge today">本日</span>';
+    else if (diff > 0 && diff <= 3) badge = `<span class="badge soon">あと${diff}日</span>`;
+    else if (diff < 0) badge = `<span class="badge">${Math.abs(diff)}日前</span>`;
+
+    const div = document.createElement('div');
+    div.className = 'event-item';
+    div.innerHTML = `
+      <div class="event-date">${ev.date}</div>
+      <div class="event-name">${ev.name}${badge}</div>
+      <button class="event-del" onclick="deleteEvent('${ev.id}')">×</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function addEvent() {
+  const d = document.getElementById('event-date-input').value;
+  const n = document.getElementById('event-name-input').value.trim();
+  if (!d || !n) return alert('日付と予定名を入力してください');
+  events.push({ id: 'e' + Date.now(), date: d, name: n });
+  saveEvents(events);
+  document.getElementById('event-date-input').value = '';
+  document.getElementById('event-name-input').value = '';
+  renderEvents();
+}
+
+function deleteEvent(id) {
+  events = events.filter(e => e.id !== id);
+  saveEvents(events);
+  renderEvents();
+}
+
+// ─────────────────────────────────────────────
+// KPI カード
+// ─────────────────────────────────────────────
+// 選択中の期間（期間ボタン）に該当する日別データを返す
+function getPeriodEntries() {
+  if (!entries.length) return [];
+  if (chartPeriod === 'all') return entries;
+  if (chartPeriod === 'range') {
+    const s = document.getElementById('range-start')?.value;
+    const e = document.getElementById('range-end')?.value;
+    return entries.filter(en => (!s || en.date >= s) && (!e || en.date <= e));
+  }
+  if (chartPeriod === 'month') {
+    const lastYm = entries[entries.length - 1].date.slice(0, 7);
+    return entries.filter(e => e.date.slice(0, 7) === lastYm);
+  }
+  return entries.slice(-Number(chartPeriod));
+}
+
+function renderKPIs() {
+  const P = getPeriodEntries();
+  const sum = (k) => P.reduce((s, e) => s + (Number(e[k]) || 0), 0);
+  const mdShort = d => { const p = String(d).split('-'); return `${Number(p[1])}/${Number(p[2])}`; };
+
+  // 期間ラベル
+  const periodTxt = P.length
+    ? `📅 期間：${mdShort(P[0].date)}〜${mdShort(P[P.length-1].date)}（${P.length}日分の合計・平均）`
+    : 'データがありません';
+  const pAd = document.getElementById('kpi-ad-period');
+  const pSa = document.getElementById('kpi-sales-period');
+  if (pAd) pAd.textContent = periodTxt;
+  if (pSa) pSa.textContent = periodTxt;
+
+  // ── 広告KPI（期間合計／加重平均）──
+  const tClicks = sum('clicks'), tImp = sum('adImp'), tBudget = sum('budget');
+  const ctr = tImp > 0 ? (tClicks / tImp * 100) : null;
+  const cpc = tClicks > 0 ? Math.round(tBudget / tClicks) : null;
+  const freqVals = P.map(e => e.freq).filter(v => v != null && v !== '');
+  const freq = freqVals.length ? freqVals.reduce((s, v) => s + Number(v), 0) / freqVals.length : null;
+  document.getElementById('kpi-ad').innerHTML = [
+    kpiCard('CTR（平均）', ctr, 2, '%', '目標 1.5%↑', v => v >= 1.5 ? 'ok' : v >= 1.0 ? 'warn' : 'bad'),
+    kpiCard('CPC（平均）', cpc, 0, '¥', '目標 ¥30↓', v => v <= 30 ? 'ok' : v <= 40 ? 'warn' : 'bad'),
+    kpiCard('クリック数（合計）', tClicks, 0, '回', '', null),
+    kpiCard('インプレッション（合計）', tImp, 0, '回', '', null),
+    kpiCard('消化予算（合計）', tBudget, 0, '¥', '', null),
+    kpiCard('フリークエンシー（平均）', freq, 1, '回', '3超えで要注意', v => v < 2 ? 'ok' : v < 3 ? 'warn' : 'bad'),
+  ].join('');
+
+  // ── 売上・アクセスKPI（期間合計＋本物のCVR・客単価）──
+  const tSales = sum('sales'), tVis = sum('visitors'), tOrders = sum('orders'), tIg = sum('igVisitors');
+  const cvr = (tVis > 0 && tOrders > 0) ? (tOrders / tVis * 100) : null;   // 転換率(%) ＝ 売上件数 ÷ アクセス人数（件数未取込なら—）
+  const aov = tOrders > 0 ? Math.round(tSales / tOrders) : null; // 客単価(円) ＝ 売上金額 ÷ 売上件数
+  document.getElementById('kpi-sales').innerHTML = [
+    kpiCard('売上金額（合計）', tSales, 0, '¥', '', null),
+    kpiCard('楽天 全体アクセス（合計）', tVis, 0, '人', '', null),
+    kpiCard('転換率（CVR）', cvr, 2, '%', '売上件数÷アクセス', v => v >= 3 ? 'ok' : v >= 1.5 ? 'warn' : 'bad'),
+    kpiCard('客単価', aov, 0, '¥', '売上÷売上件数', null),
+    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null),
+  ].join('');
+}
+
+function kpiCard(label, value, decimals, unit, target, colorFn, wow) {
+  const na   = value == null || value === '';
+  const num  = na ? null : Number(value);
+  const disp = na ? '—' : (unit === '¥' ? `¥${num.toLocaleString()}` : `${decimals != null ? num.toFixed(decimals) : num.toLocaleString()}${unit}`);
+  let cls = 'na';
+  if (!na && colorFn) cls = colorFn(num);
+  return `<div class="kpi-card ${cls}">
+    <div class="kpi-label">${label}</div>
+    <div style="display:flex;align-items:baseline;gap:6px;">
+      <div class="kpi-value">${disp}</div>
+      ${wow || ''}
+    </div>
+    ${target ? `<div class="kpi-target">${target}</div>` : ''}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────
+// チャート
+// ─────────────────────────────────────────────
+let chartPeriod = 'all';
+
+function getChartData() {
+  if (chartPeriod === 'month') return getMonthlyData();
+  if (chartPeriod === 'range') {
+    const s = document.getElementById('range-start')?.value;
+    const e = document.getElementById('range-end')?.value;
+    const filtered = entries.filter(en => (!s || en.date >= s) && (!e || en.date <= e));
+    const countEl = document.getElementById('range-count');
+    if (countEl) countEl.textContent = `${filtered.length}件`;
+    return filtered;
+  }
+  if (chartPeriod === 'all') return entries;
+  return entries.slice(-Number(chartPeriod));
+}
+function getChartLabels(d) {
+  return chartPeriod === 'month'
+    ? d.map(e => e.date.slice(0, 7))
+    : d.map(e => e.date.slice(5));
+}
+function getMonthlyData() {
+  const byMonth = {};
+  entries.forEach(e => {
+    const ym = e.date ? e.date.slice(0, 7) : null;
+    if (!ym) return;
+    if (!byMonth[ym]) byMonth[ym] = {
+      sales:0, visitors:0, igVisitors:0, searchVisitors:0,
+      extVisitors:0, intVisitors:0, clicks:0, adImp:0, budget:0,
+      ctrSum:0, ctrN:0, cpcSum:0, cpcN:0, freqSum:0, freqN:0
+    };
+    const m = byMonth[ym];
+    ['sales','visitors','igVisitors','searchVisitors','extVisitors','intVisitors','clicks','adImp','budget'].forEach(k => {
+      if (e[k] != null) m[k] += Number(e[k]);
+    });
+    if (e.ctr  != null) { m.ctrSum  += Number(e.ctr);  m.ctrN++;  }
+    if (e.cpc  != null) { m.cpcSum  += Number(e.cpc);  m.cpcN++;  }
+    if (e.freq != null) { m.freqSum += Number(e.freq); m.freqN++; }
+  });
+  return Object.keys(byMonth).sort().map(ym => {
+    const m = byMonth[ym];
+    return {
+      date: ym,
+      sales: m.sales || null, visitors: m.visitors || null,
+      igVisitors: m.igVisitors || null, searchVisitors: m.searchVisitors || null,
+      extVisitors: m.extVisitors || null, intVisitors: m.intVisitors || null,
+      clicks: m.clicks || null, adImp: m.adImp || null, budget: m.budget || null,
+      ctr:  m.ctrN  ? parseFloat((m.ctrSum  / m.ctrN).toFixed(2))  : null,
+      cpc:  m.cpcN  ? Math.round(m.cpcSum  / m.cpcN)                : null,
+      freq: m.freqN ? parseFloat((m.freqSum / m.freqN).toFixed(2)) : null,
+    };
+  });
+}
+function setChartPeriod(p) {
+  chartPeriod = p;
+  document.querySelectorAll('.chart-period-btn').forEach(b => {
+    b.classList.toggle('active', String(b.dataset.p) === String(p));
+  });
+  const rangeBar = document.getElementById('chart-range-bar');
+  if (rangeBar) rangeBar.style.display = p === 'range' ? 'block' : 'none';
+  // 日付指定モード初期値をセット
+  if (p === 'range' && entries.length) {
+    const s = document.getElementById('range-start');
+    const e = document.getElementById('range-end');
+    if (s && !s.value) s.value = entries[0].date;
+    if (e && !e.value) e.value = entries[entries.length - 1].date;
+  }
+  renderCharts();
+  renderKPIs();
+  if (typeof calView !== 'undefined' && calView === 'gantt') renderGantt();
+}
+
+const CHART_DEFAULTS = {
+  responsive: true,
+  plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } },
+  scales: {
+    x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+    y: { grid: { color: '#F0F0F0' }, ticks: { font: { size: 11 } } },
+  }
+};
+
+function last10() { return getChartData(); }
+function labels()  { return getChartLabels(last10()); }
+
+function makeChart(id, type, datasets, extra = {}) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, {
+    type,
+    data: { labels: labels(), datasets },
+    options: { ...CHART_DEFAULTS, ...extra }
+  });
+}
+
+function targetLine(label, value, color) {
+  return {
+    label,
+    data: last10().map(() => value),
+    borderColor: color,
+    borderDash: [4,4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    tension: 0,
+  };
+}
+
+function renderCharts() {
+  const d = last10();
+  const l = labels();
+
+  // 広告
+  makeChart('chart-ctr', 'line', [
+    { label:'CTR(%)', data: d.map(e=>e.ctr||null), borderColor:'#26A69A', backgroundColor:'rgba(38,166,154,0.08)', tension:0.3, fill:true },
+    targetLine('目標1.5%', 1.5, '#FFB74D'),
+  ]);
+  makeChart('chart-cpc', 'line', [
+    { label:'CPC(¥)', data: d.map(e=>e.cpc||null), borderColor:'#EF5350', backgroundColor:'rgba(239,83,80,0.08)', tension:0.3, fill:true },
+    targetLine('目標¥30', 30, '#FFB74D'),
+  ]);
+  makeChart('chart-clicks', 'bar', [
+    { label:'クリック数', data: d.map(e=>e.clicks||null), backgroundColor:'rgba(121,134,203,0.7)', yAxisID:'y' },
+    { label:'インプレッション', type:'line', data: d.map(e=>e.adImp||null), borderColor:'#42A5F5', tension:0.3, yAxisID:'y1', pointRadius:3 },
+  ], { scales: { ...CHART_DEFAULTS.scales, y1: { position:'right', grid:{ drawOnChartArea:false }, ticks:{ font:{size:11} } } } });
+
+  // 売上
+  makeChart('chart-sales', 'bar', [
+    { label:'売上(¥)', data: d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.7)' },
+  ]);
+  makeChart('chart-visitors', 'line', [
+    { label:'楽天 全体アクセス', data: d.map(e=>e.visitors||null), borderColor:'#BDBDBD', tension:0.3 },
+    { label:'Instagram→楽天 流入', data: d.map(e=>e.igVisitors||null), borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true },
+    { label:'楽天サーチ流入', data: d.map(e=>e.searchVisitors||null), borderColor:'#7986CB', backgroundColor:'rgba(121,134,203,0.08)', tension:0.3, fill:true },
+  ]);
+  makeChart('chart-access-breakdown', 'bar', [
+    { label:'🌐 楽天外アクセス', data: d.map(e=>e.extVisitors||null), backgroundColor:'rgba(255,112,67,0.7)', stack:'s' },
+    { label:'🏪 楽天内アクセス', data: d.map(e=>e.intVisitors||null), backgroundColor:'rgba(38,166,154,0.7)', stack:'s' },
+    { label:'📸 Instagram流入', data: d.map(e=>e.igVisitors||null), backgroundColor:'rgba(233,30,99,0.7)', stack:'s' },
+  ], { scales: { x: { stacked:true }, y: { stacked:true } } });
+}
+
+// ─────────────────────────────────────────────
+// 履歴テーブル
+// ─────────────────────────────────────────────
+function renderHistory() {
+  const tbody = document.getElementById('history-body');
+  tbody.innerHTML = '';
+  if (entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty" style="padding:16px">まだデータがありません</td></tr>';
+    return;
+  }
+  [...entries].reverse().forEach((e, i) => {
+    const realIdx = entries.length - 1 - i;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${e.date}</td>
+      <td>${e.ctr != null ? e.ctr+'%' : '—'}</td>
+      <td>${e.cpc != null ? '¥'+e.cpc : '—'}</td>
+      <td>${e.clicks ?? '—'}</td>
+      <td>${e.freq ?? '—'}</td>
+      <td>${e.reach != null ? Number(e.reach).toLocaleString() : '—'}</td>
+      <td>${e.engage != null ? e.engage+'%' : '—'}</td>
+      <td>${e.follower != null ? (e.follower>0?'+':'')+e.follower : '—'}</td>
+      <td>${e.sales != null ? '¥'+Number(e.sales).toLocaleString() : '—'}</td>
+      <td>${e.visitors != null ? Number(e.visitors).toLocaleString() : '—'}</td>
+      <td>${e.igVisitors != null ? Number(e.igVisitors).toLocaleString() : '—'}</td>
+      <td>${e.searchVisitors != null ? Number(e.searchVisitors).toLocaleString() : '—'}</td>
+      <td><button class="del-btn" onclick="deleteEntry(${realIdx})">×</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function deleteEntry(idx) {
+  if (!confirm('このデータを削除しますか？')) return;
+  entries.splice(idx, 1);
+  saveEntries(entries);
+  renderAll();
+}
+
+function renderAll() {
+  renderEvents();
+  renderKPIs();
+  renderCharts();
+  renderHistory();
+}
+
+// ─────────────────────────────────────────────
+// モーダル
+// ─────────────────────────────────────────────
+function openModal() {
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+function saveEntry() {
+  const get = id => {
+    const v = document.getElementById(id).value;
+    return v === '' ? null : Number(v);
+  };
+  const entry = {
+    date:     document.getElementById('entry-date').value,
+    ctr:      get('f-ctr'),
+    cpc:      get('f-cpc'),
+    clicks:   get('f-clicks'),
+    adImp:    get('f-ad-imp'),
+    budget:   get('f-budget'),
+    freq:     get('f-freq'),
+    reach:    get('f-reach'),
+    imp:      get('f-imp'),
+    engage:   get('f-engage'),
+    saves:    get('f-saves'),
+    follower: get('f-follower'),
+    profile:  get('f-profile'),
+    sales:      get('f-sales'),
+    visitors:   get('f-visitors'),
+    igVisitors: get('f-ig-visitors'),
+  };
+  if (!entry.date) return alert('日付を入力してください');
+
+  // 同日があれば上書き
+  const idx = entries.findIndex(e => e.date === entry.date);
+  if (idx >= 0) {
+    if (!confirm('同じ日付のデータがあります。上書きしますか？')) return;
+    entries[idx] = entry;
+  } else {
+    entries.push(entry);
+    entries.sort((a,b) => a.date.localeCompare(b.date));
+  }
+  saveEntries(entries);
+  closeModal();
+  clearForm();
+  renderAll();
+}
+
+function clearForm() {
+  ['f-ctr','f-cpc','f-clicks','f-ad-imp','f-budget','f-freq',
+   'f-reach','f-imp','f-engage','f-saves','f-follower','f-profile',
+   'f-sales','f-visitors','f-ig-visitors'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('entry-date').value = toDateStr(new Date());
+}
+
+// ─────────────────────────────────────────────
+// タブ
+// ─────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// ユーティリティ
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// 楽天店舗データCSVインポート
+// ─────────────────────────────────────────────
+// 日付をゼロ埋め正規化（2026-6-1 → 2026-06-01）
+function normalizeEntryDate(d) {
+  if (!d) return d;
+  const p = String(d).split('-');
+  if (p.length !== 3) return d;
+  return p[0] + '-' + String(Number(p[1])).padStart(2,'0') + '-' + String(Number(p[2])).padStart(2,'0');
+}
+
+// 日付フォーマット違いで重複した行を正規化してマージ（非null値を優先的に統合）
+function dedupeEntries(list) {
+  const map = {};
+  list.forEach(en => {
+    const nd = normalizeEntryDate(en.date);
+    const cur = map[nd] || { date: nd };
+    Object.keys(en).forEach(k => {
+      if (k === 'date') return;
+      if (en[k] != null && en[k] !== '') cur[k] = en[k];   // 非nullの値で上書き
+      else if (!(k in cur)) cur[k] = en[k];                // 未設定なら空でも入れる
+    });
+    map[nd] = cur;
+  });
+  return Object.values(map);
+}
+
+// 修復が必要か判定（非正規化日付・空行・重複日付があれば true）
+function needsEntryRepair(list) {
+  const seen = new Set();
+  for (const en of list) {
+    const nd = normalizeEntryDate(en.date);
+    if (en.date !== nd) return true;       // ゼロ埋めされていない
+    if (isEmptyEntry(en)) return true;     // 空データ行
+    if (seen.has(nd)) return true;         // 重複日付
+    seen.add(nd);
+  }
+  return false;
+}
+
+// その日のデータが実質空かどうか（全指標が null/0/空 なら空行とみなす）
+function isEmptyEntry(en) {
+  const keys = ['sales','visitors','clicks','adImp','budget','ctr','cpc','freq','reach','imp',
+                'engage','saves','follower','profile','igVisitors','searchVisitors','extVisitors','intVisitors'];
+  return keys.every(k => en[k] == null || en[k] === 0 || en[k] === '');
+}
+
+function importRakutenCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const text = e.target.result;
+      const rows = parseRakutenCSV(text);
+      if (rows.length === 0) { alert('有効なデータが見つかりませんでした'); return; }
+      let added = 0, updated = 0;
+      rows.forEach(row => {
+        const idx = entries.findIndex(en => en.date === row.date);
+        if (idx >= 0) {
+          // 売上・アクセス・売上件数だけ上書き（広告・流入データは保持）
+          entries[idx].sales    = row.sales;
+          entries[idx].visitors = row.visitors;
+          entries[idx].orders   = row.orders;
+          updated++;
+        } else {
+          entries.push({ ...row, ctr:null,cpc:null,clicks:null,adImp:null,budget:null,freq:null,reach:null,imp:null,engage:null,saves:null,follower:null,profile:null });
+          added++;
+        }
+      });
+      // 修復：日付フォーマット違いの重複をマージ＋空データ行を掃除
+      const beforeLen = entries.length;
+      entries = dedupeEntries(entries);          // 2026-6-10 と 2026-06-10 を統合
+      entries = entries.filter(en => !isEmptyEntry(en));
+      const removed = beforeLen - entries.length;
+      entries.sort((a,b) => a.date.localeCompare(b.date));
+      saveEntries(entries);
+      renderAll();
+      alert(`取り込み完了：${added}件追加、${updated}件更新` + (removed > 0 ? `、${removed}件の重複・空データを整理` : '') + `（「すべて」デバイスの日別データ）`);
+    } catch(err) {
+      alert('CSVの読み込みに失敗しました: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseRakutenCSV(text) {
+  const result = [];
+  const lines = text.replace(/\r\n/g,'\n').split('\n');
+  for (const line of lines) {
+    if (!line.startsWith('"2026') && !line.startsWith('2026')) continue;
+    // CSV行をパース
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    fields.push(cur);
+    const device = fields[2];
+    if (device !== 'すべて') continue;
+    // データが無い日（未来日・未集計日など）はスキップ：売上もアクセスも空欄なら取り込まない
+    const salesRaw  = (fields[3] ?? '').trim();
+    const accessRaw = (fields[5] ?? '').trim();
+    if (salesRaw === '' && accessRaw === '') continue;
+    const dateRaw = fields[0].replace(/\//g, '-').replace(/"/g,'');
+    const sales    = Number(salesRaw)  || 0;
+    const visitors = Number(accessRaw) || 0;
+    const orders   = Number((fields[4] ?? '').trim()) || 0;  // 売上件数（CVR・客単価の計算に使用）
+    result.push({ date: dateRaw, sales, visitors, orders });
+  }
+  return result;
+}
+
+// ─────────────────────────────────────────────
+// IG流入まとめ入力
+// ─────────────────────────────────────────────
+function openIgModal() {
+  renderIgRows();
+  document.getElementById('ig-modal').classList.add('open');
+}
+function closeIgModal() {
+  document.getElementById('ig-modal').classList.remove('open');
+}
+document.getElementById('ig-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('ig-modal')) closeIgModal();
+});
+
+function renderIgRows() {
+  const days = parseInt(document.getElementById('ig-days-select').value);
+  const container = document.getElementById('ig-rows');
+  const today = new Date();
+  const rows = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = toDateStr(d);
+    const ex = entries.find(e => e.date === dateStr);
+    rows.push({
+      dateStr,
+      weekday: d.toLocaleDateString('ja-JP', { weekday: 'short' }),
+      extVal: ex?.extVisitors  ?? '',
+      intVal: ex?.intVisitors  ?? '',
+      igVal:  ex?.igVisitors   ?? '',
+      srVal:  ex?.searchVisitors ?? '',
+    });
+  }
+  const inp = (id, val) => `<input type="number" id="${id}" value="${val}" placeholder="—"
+    style="width:100%;border:1px solid #E0E0E0;border-radius:6px;padding:6px 6px;font-size:12px;text-align:right;">`;
+  container.innerHTML = rows.map(r => `
+    <div style="display:grid;grid-template-columns:64px 1fr 1fr 1fr 1fr;gap:4px;align-items:center;padding:5px 0;border-bottom:1px solid #F5F5F5;">
+      <div style="font-size:11px;white-space:nowrap;">${r.dateStr.slice(5)}<span style="color:#ccc;"> ${r.weekday}</span></div>
+      ${inp('ext-'+r.dateStr, r.extVal)}
+      ${inp('int-'+r.dateStr, r.intVal)}
+      ${inp('ig-'+r.dateStr,  r.igVal)}
+      ${inp('sr-'+r.dateStr,  r.srVal)}
+    </div>
+  `).join('');
+}
+
+function saveIgEntries() {
+  const days = parseInt(document.getElementById('ig-days-select').value);
+  const today = new Date();
+  let saved = 0;
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = toDateStr(d);
+    const getVal = id => { const el = document.getElementById(id); return el?.value !== '' ? Number(el.value) : null; };
+    const extVal = getVal(`ext-${dateStr}`);
+    const intVal = getVal(`int-${dateStr}`);
+    const igVal  = getVal(`ig-${dateStr}`);
+    const srVal  = getVal(`sr-${dateStr}`);
+    if (extVal===null && intVal===null && igVal===null && srVal===null) continue;
+    const idx = entries.findIndex(e => e.date === dateStr);
+    if (idx >= 0) {
+      if (extVal !== null) entries[idx].extVisitors    = extVal;
+      if (intVal !== null) entries[idx].intVisitors    = intVal;
+      if (igVal  !== null) entries[idx].igVisitors     = igVal;
+      if (srVal  !== null) entries[idx].searchVisitors = srVal;
+    } else {
+      entries.push({
+        date: dateStr,
+        extVisitors: extVal, intVisitors: intVal, igVisitors: igVal, searchVisitors: srVal,
+        ctr:null,cpc:null,clicks:null,adImp:null,budget:null,freq:null,
+        reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,
+        sales:null,visitors:null,
+      });
+    }
+    saved++;
+  }
+  entries.sort((a,b) => a.date.localeCompare(b.date));
+  saveEntries(entries);
+  closeIgModal();
+  renderAll();
+  if (saved > 0) alert(`${saved}日分を保存しました`);
+}
+
+// ─────────────────────────────────────────────
+// インサイト自動生成
+// ─────────────────────────────────────────────
+function generateInsights(d, monthly, monthlySales, monthlyVisitors, monthlyIg, avgCtr, avgCpc) {
+  const insights = [];
+  const warns    = [];
+  const actions  = [];
+
+  const recent  = d.slice(-7);
+  const prev    = d.slice(-14, -7);
+
+  // CTR分析
+  const recentCtr = recent.filter(e=>e.ctr).map(e=>Number(e.ctr));
+  const prevCtr   = prev.filter(e=>e.ctr).map(e=>Number(e.ctr));
+  if (recentCtr.length && prevCtr.length) {
+    const rcAvg = recentCtr.reduce((a,b)=>a+b,0)/recentCtr.length;
+    const pcAvg = prevCtr.reduce((a,b)=>a+b,0)/prevCtr.length;
+    const diff  = rcAvg - pcAvg;
+    if (diff > 0.5) insights.push(`直近7日のCTR平均 ${rcAvg.toFixed(1)}% は前週比 +${diff.toFixed(1)}pt 上昇。広告クリエイティブが訴求できています。`);
+    else if (diff < -0.5) warns.push(`CTRが前週比 ${diff.toFixed(1)}pt 低下（${rcAvg.toFixed(1)}%）。クリエイティブの見直しを検討してください。`);
+  }
+  if (avgCtr !== '—' && Number(avgCtr) < 1.5) warns.push(`平均CTR ${avgCtr}% は目標1.5%を下回っています。訴求文言・画像のA/Bテストを推奨します。`);
+  else if (avgCtr !== '—' && Number(avgCtr) >= 1.5) insights.push(`平均CTR ${avgCtr}% は目標1.5%を達成しています。`);
+
+  // CPC分析
+  if (avgCpc !== '—' && Number(avgCpc) > 30) warns.push(`平均CPC ¥${avgCpc} が目標¥30を超えています。ターゲティングの絞り込みを検討してください。`);
+  else if (avgCpc !== '—') insights.push(`平均CPC ¥${avgCpc} は目標¥30以内に収まっています。`);
+
+  // 売上集中度
+  const salesArr = d.filter(e=>e.sales).map(e=>Number(e.sales));
+  if (salesArr.length >= 3) {
+    const maxSales = Math.max(...salesArr);
+    const totalSales = salesArr.reduce((a,b)=>a+b,0);
+    const maxShare = maxSales / totalSales;
+    if (maxShare > 0.4) warns.push(`売上の${(maxShare*100).toFixed(0)}%が1日に集中しています。セール依存度が高いため、平常時の底上げ施策（定期投稿・広告の継続）が重要です。`);
+  }
+
+  // Instagram流入
+  if (monthlyIg > 0) {
+    const igRate = monthlyVisitors > 0 ? (monthlyIg/monthlyVisitors*100).toFixed(1) : 0;
+    insights.push(`Instagram経由の楽天流入：${monthlyIg.toLocaleString()}人（全体の${igRate}%）。`);
+    if (monthlyIg < 200) actions.push('Instagram→楽天の流入が少ない。プロフィールリンク・ストーリーズでの誘導を強化しましょう。');
+  }
+
+  // 次のアクション提案
+  const upcomingEvents = loadCalEvents().filter(e => {
+    const d = new Date(); d.setHours(0,0,0,0);
+    const ev = new Date(e.start);
+    const diff = Math.floor((ev - d) / 86400000);
+    return diff >= 0 && diff <= 14;
+  });
+  if (upcomingEvents.length > 0) {
+    const ev = upcomingEvents[0];
+    const days = Math.floor((new Date(ev.start) - new Date()) / 86400000);
+    actions.push(`「${ev.title}」まで${days <= 0 ? '本日開始' : `あと${days}日`}。広告・投稿の準備を進めましょう。`);
+  }
+
+  // 一般アクション
+  if (actions.length === 0) actions.push('引き続き定期的なデータ確認と広告クリエイティブの更新を行いましょう。');
+
+  return { insights, warns, actions };
+}
+
+// ─────────────────────────────────────────────
+// 印刷レポート生成
+// ─────────────────────────────────────────────
+function openReport() {
+  const today = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+  const d = entries.slice(-14); // 直近14件
+  const latest = entries.length ? entries[entries.length - 1] : {};
+
+  // 月合計
+  const ym = new Date().toISOString().slice(0,7);
+  const monthly = entries.filter(e => e.date && e.date.startsWith(ym));
+  const monthlySales    = monthly.reduce((s,e) => s + (Number(e.sales)||0), 0);
+  const monthlyClicks   = monthly.reduce((s,e) => s + (Number(e.clicks)||0), 0);
+  const monthlyVisitors = monthly.reduce((s,e) => s + (Number(e.visitors)||0), 0);
+  const monthlyIg       = monthly.reduce((s,e) => s + (Number(e.igVisitors)||0), 0);
+  const monthlyFollower = monthly.reduce((s,e) => s + (Number(e.follower)||0), 0);
+  const avgCtr = monthly.filter(e=>e.ctr).length ? (monthly.reduce((s,e)=>s+(Number(e.ctr)||0),0)/monthly.filter(e=>e.ctr).length).toFixed(2) : '—';
+  const avgCpc = monthly.filter(e=>e.cpc).length ? Math.round(monthly.reduce((s,e)=>s+(Number(e.cpc)||0),0)/monthly.filter(e=>e.cpc).length) : '—';
+
+  const { insights, warns, actions } = generateInsights(d, monthly, monthlySales, monthlyVisitors, monthlyIg, avgCtr, avgCpc);
+  const insightHtml = [
+    ...warns.map(t    => `<div style="display:flex;gap:8px;margin-bottom:6px;"><span style="color:#F57C00;font-size:14px;flex-shrink:0;">⚠️</span><span>${t}</span></div>`),
+    ...insights.map(t => `<div style="display:flex;gap:8px;margin-bottom:6px;"><span style="color:#43A047;font-size:14px;flex-shrink:0;">✅</span><span>${t}</span></div>`),
+    '<div style="margin-top:8px;font-weight:700;font-size:11px;color:#888;letter-spacing:0.05em;">▶ 次にすること</div>',
+    ...actions.map(t  => `<div style="display:flex;gap:8px;margin-bottom:6px;margin-top:4px;"><span style="color:#1565C0;font-size:14px;flex-shrink:0;">→</span><span>${t}</span></div>`),
+  ].join('');
+
+  const labels = d.map(e => e.date.slice(5));
+  const toJson = v => JSON.stringify(v);
+
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>MIOOGGI インスタ・広告レポート</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"><\/script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Hiragino Sans','Helvetica Neue',sans-serif; background:#fff; color:#2D2D2D; font-size:13px; }
+  .page { width:210mm; min-height:297mm; margin:0 auto; padding:14mm 14mm 10mm; }
+  @media print {
+    body { margin:0; }
+    .page { margin:0; padding:10mm 12mm; page-break-after:always; }
+    .no-print { display:none !important; }
+    canvas { max-width:100% !important; }
+  }
+
+  /* ヘッダー */
+  .report-header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #2D2D2D; padding-bottom:10px; margin-bottom:18px; }
+  .report-title { font-size:20px; font-weight:800; letter-spacing:0.05em; }
+  .report-sub   { font-size:12px; color:#888; margin-top:3px; }
+  .report-date  { font-size:12px; color:#888; text-align:right; }
+
+  /* KPIグリッド */
+  .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:18px; }
+  .kpi-box { border:1px solid #E0E0E0; border-radius:8px; padding:10px 12px; }
+  .kpi-box.accent { background:#2D2D2D; color:#fff; border-color:#2D2D2D; }
+  .kpi-box.accent .kl { color:#aaa; }
+  .kl { font-size:10px; color:#888; font-weight:700; margin-bottom:4px; }
+  .kv { font-size:20px; font-weight:800; line-height:1.1; }
+  .ks { font-size:10px; color:#aaa; margin-top:3px; }
+  .ok  .kv { color:#43A047; }
+  .warn .kv { color:#FB8C00; }
+  .bad .kv  { color:#E53935; }
+
+  /* セクション */
+  .section { margin-bottom:18px; }
+  .section-title { font-size:11px; font-weight:800; letter-spacing:0.1em; color:#888; text-transform:uppercase; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #EBEBEB; }
+
+  /* チャートラッパー */
+  .chart-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .chart-box { border:1px solid #EBEBEB; border-radius:8px; padding:12px; }
+  .chart-box.full { grid-column:1/-1; }
+  .chart-label { font-size:11px; font-weight:700; margin-bottom:8px; color:#555; }
+
+  /* テーブル */
+  .data-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .data-table th { background:#F5F5F5; padding:6px 8px; text-align:left; font-weight:700; color:#666; border-bottom:1px solid #E0E0E0; }
+  .data-table td { padding:5px 8px; border-bottom:1px solid #F0F0F0; }
+  .data-table tr:last-child td { border-bottom:none; }
+  .tag { display:inline-block; font-size:9px; padding:1px 5px; border-radius:3px; font-weight:700; }
+  .tag.ok   { background:#E8F5E9; color:#2E7D32; }
+  .tag.warn { background:#FFF3E0; color:#E65100; }
+  .tag.bad  { background:#FFEBEE; color:#C62828; }
+
+  /* コメント欄 */
+  .comment-box { border:1px solid #E0E0E0; border-radius:8px; padding:12px; min-height:60px; }
+  .comment-box p { font-size:11px; color:#aaa; }
+
+  /* 印刷ボタン */
+  .print-btn { position:fixed; top:20px; right:20px; background:#2D2D2D; color:#fff; border:none; border-radius:8px; padding:12px 24px; font-size:14px; font-weight:700; cursor:pointer; z-index:100; }
+  .print-btn:hover { background:#444; }
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ 印刷する</button>
+
+<!-- ページ1: サマリー -->
+<div class="page">
+  <div class="report-header">
+    <div>
+      <div class="report-title">MIOOGGI インスタ・広告レポート</div>
+      <div class="report-sub">reCross リクロス ／ 楽天市場店</div>
+    </div>
+    <div class="report-date">作成日：${today}</div>
+  </div>
+
+  <!-- 今月のKPI -->
+  <div class="section">
+    <div class="section-title">📊 今月のサマリー</div>
+    <div class="kpi-grid">
+      <div class="kpi-box accent">
+        <div class="kl">売上金額（今月累計）</div>
+        <div class="kv">¥${monthlySales.toLocaleString()}</div>
+        <div class="ks">楽天店舗カルテより</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">平均CTR（広告）</div>
+        <div class="kv">${avgCtr}${avgCtr!=='—'?'%':''}</div>
+        <div class="ks">Meta広告マネージャ</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">平均CPC（広告）</div>
+        <div class="kv">${avgCpc!=='—'?'¥':''}${avgCpc}</div>
+        <div class="ks">Meta広告マネージャ</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">Instagram→楽天 流入</div>
+        <div class="kv">${monthlyIg.toLocaleString()}人</div>
+        <div class="ks">楽天RMS 参照元分析</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">広告クリック数（今月）</div>
+        <div class="kv">${monthlyClicks.toLocaleString()}回</div>
+        <div class="ks">Meta広告マネージャ</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">楽天 全体アクセス</div>
+        <div class="kv">${monthlyVisitors.toLocaleString()}人</div>
+        <div class="ks">楽天RMS 店舗カルテ</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">フォロワー増減（今月）</div>
+        <div class="kv">${monthlyFollower>0?'+':''}${monthlyFollower}人</div>
+        <div class="ks">Meta Business Suite</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">最新CTR</div>
+        <div class="kv">${latest.ctr!=null?latest.ctr+'%':'—'}</div>
+        <div class="ks">${latest.date||''}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 売上グラフ -->
+  <div class="section">
+    <div class="section-title">📈 売上・楽天流入推移</div>
+    <div class="chart-box full">
+      <canvas id="r-sales" height="55"></canvas>
+    </div>
+  </div>
+
+  <!-- 広告グラフ -->
+  <div class="section">
+    <div class="section-title">📣 広告パフォーマンス</div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="chart-label">CTR推移（目標1.5%）</div>
+        <canvas id="r-ctr" height="90"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-label">CPC推移（目標¥30）</div>
+        <canvas id="r-cpc" height="90"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- AIインサイト -->
+  <div class="section">
+    <div class="section-title">🤖 データからわかること・次にすること</div>
+    <div style="background:#F8F9FF;border:1px solid #E8EAF6;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
+      ${insightHtml}
+    </div>
+  </div>
+
+  <!-- コメント -->
+  <div class="section">
+    <div class="section-title">💬 所見・補足コメント</div>
+    <div class="comment-box">
+      <p>（印刷前に記入してください）</p>
+    </div>
+  </div>
+
+  <!-- データ出典 -->
+  <div style="margin-top:auto;padding-top:16px;border-top:1px solid #EBEBEB;font-size:10px;color:#aaa;display:flex;gap:20px;flex-wrap:wrap;">
+    <span>📣 広告データ：Meta広告マネージャ</span>
+    <span>🛒 売上・全体アクセス：楽天RMS 店舗カルテ（データダウンロード）</span>
+    <span>🔗 Instagram流入：楽天RMS 参照元・検索キーワード分析</span>
+  </div>
+</div>
+
+<!-- ページ2: 詳細データ -->
+<div class="page">
+  <div class="report-header">
+    <div>
+      <div class="report-title">詳細データ</div>
+      <div class="report-sub">直近データ一覧</div>
+    </div>
+    <div class="report-date">作成日：${today}</div>
+  </div>
+
+  <!-- データ一覧テーブル -->
+  <div class="section">
+    <div class="section-title">📋 日別データ一覧（直近14件）</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>日付</th>
+          <th>CTR</th><th>CPC</th><th>クリック</th>
+          <th>売上</th><th>全体流入</th><th>IG流入</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${d.map(e => {
+          const ctrTag = e.ctr==null?'':`<span class="tag ${Number(e.ctr)>=1.5?'ok':Number(e.ctr)>=1.0?'warn':'bad'}">${e.ctr}%</span>`;
+          const cpcTag = e.cpc==null?'':`<span class="tag ${Number(e.cpc)<=30?'ok':Number(e.cpc)<=40?'warn':'bad'}">¥${e.cpc}</span>`;
+          return `<tr>
+            <td>${e.date}</td>
+            <td>${ctrTag||'—'}</td>
+            <td>${cpcTag||'—'}</td>
+            <td>${e.clicks!=null?Number(e.clicks).toLocaleString()+'回':'—'}</td>
+            <td>${e.sales!=null?'¥'+Number(e.sales).toLocaleString():'—'}</td>
+            <td>${e.visitors!=null?Number(e.visitors).toLocaleString()+'人':'—'}</td>
+            <td>${e.igVisitors!=null?Number(e.igVisitors).toLocaleString()+'人':'—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 次回アクション -->
+  <div class="section">
+    <div class="section-title">🎯 次回アクション・メモ</div>
+    <div class="comment-box" style="min-height:80px;">
+      <p>（印刷前に記入してください）</p>
+    </div>
+  </div>
+
+  <!-- データ出典 -->
+  <div style="margin-top:auto;padding-top:16px;border-top:1px solid #EBEBEB;font-size:10px;color:#aaa;display:flex;gap:20px;flex-wrap:wrap;">
+    <span>📣 広告データ：Meta広告マネージャ</span>
+    <span>🛒 売上・全体アクセス：楽天RMS 店舗カルテ（データダウンロード）</span>
+    <span>🔗 Instagram流入：楽天RMS 参照元・検索キーワード分析</span>
+  </div>
+</div>
+
+<script>
+const d = ${toJson(d)};
+const labels = ${toJson(labels)};
+const opt = {
+  responsive:true,
+  plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } },
+  scales:{
+    x:{ grid:{display:false}, ticks:{font:{size:9}} },
+    y:{ grid:{color:'#F5F5F5'}, ticks:{font:{size:9}} }
+  }
+};
+function target(val,color){ return { label:'目標', data:d.map(()=>val), borderColor:color, borderDash:[3,3], borderWidth:1, pointRadius:0 }; }
+
+new Chart(document.getElementById('r-sales'),{ type:'bar', data:{ labels, datasets:[
+  { label:'売上(¥)', data:d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.7)', yAxisID:'y' },
+  { label:'IG流入', type:'line', data:d.map(e=>e.igVisitors||null), borderColor:'#FF7043', tension:0.3, yAxisID:'y1', pointRadius:3 },
+]}, options:{...opt, scales:{...opt.scales, y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:9}}}}} });
+
+new Chart(document.getElementById('r-ctr'),{ type:'line', data:{ labels, datasets:[
+  { label:'CTR(%)', data:d.map(e=>e.ctr||null), borderColor:'#26A69A', tension:0.3, backgroundColor:'rgba(38,166,154,0.08)', fill:true },
+]}, options:opt });
+
+new Chart(document.getElementById('r-cpc'),{ type:'line', data:{ labels, datasets:[
+  { label:'CPC(¥)', data:d.map(e=>e.cpc||null), borderColor:'#EF5350', tension:0.3, backgroundColor:'rgba(239,83,80,0.08)', fill:true },
+]}, options:opt });
+
+<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+function toggleGuide() {
+  const body = document.getElementById('guide-body');
+  const arrow = document.getElementById('guide-arrow');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  arrow.textContent = open ? '▲' : '▼';
+}
+
+function toDateStr(d) {
+  return d.toISOString().slice(0,10);
+}
+
+// ─────────────────────────────────────────────
+// 初期シードデータ（Firestore未作成時のみ実行）
+// ─────────────────────────────────────────────
+function seedAndSave() {
+  const seedEntries = [
+    { date:'2026-06-04', sales:182300, visitors:730,  ctr:13.33,cpc:2,  clicks:2,   adImp:15,   budget:4,    freq:1.00, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-05', sales:161220, visitors:798,  ctr:6.37, cpc:10, clicks:188, adImp:2951, budget:1804, freq:1.07, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-06', sales:75020,  visitors:685,  ctr:7.54, cpc:7,  clicks:215, adImp:2852, budget:1440, freq:1.04, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-07', sales:60445,  visitors:925,  ctr:7.37, cpc:6,  clicks:293, adImp:3974, budget:1741, freq:1.06, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-08', sales:55430,  visitors:629,  ctr:6.43, cpc:7,  clicks:150, adImp:2334, budget:1004, freq:1.05, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-09', sales:48105,  visitors:947,  ctr:5.84, cpc:8,  clicks:374, adImp:6405, budget:2938, freq:1.04, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-10', sales:349155, visitors:1313, ctr:6.16, cpc:8,  clicks:561, adImp:9103, budget:4325, freq:1.08, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-11', sales:21266,  visitors:388,  ctr:5.50, cpc:9,  clicks:6,   adImp:109,  budget:54,   freq:1.00, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-12', sales:13068,  visitors:322,  ctr:6.75, cpc:8,  clicks:101, adImp:1496, budget:780,  freq:1.05, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-13', sales:32202,  visitors:396,  ctr:7.06, cpc:7,  clicks:194, adImp:2748, budget:1301, freq:1.11, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-14', sales:28425,  visitors:513,  ctr:7.31, cpc:6,  clicks:277, adImp:3791, budget:1655, freq:1.05, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-15', sales:13068,  visitors:426,  ctr:7.00, cpc:6,  clicks:203, adImp:2902, budget:1304, freq:1.06, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-16', sales:0,      visitors:183,  ctr:6.38, cpc:10, clicks:22,  adImp:345,  budget:211,  freq:1.01, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+    { date:'2026-06-17', sales:0,      visitors:448,  ctr:9.62, cpc:5,  clicks:210, adImp:2182, budget:1149, freq:1.03, reach:null,imp:null,engage:null,saves:null,follower:null,profile:null,igVisitors:null },
+  ];
+  const seedEvents = [
+    { id: 'e1', date: '2026-06-20', name: 'お買い物マラソン 広告スタート' },
+    { id: 'e2', date: '2026-06-26', name: 'お買い物マラソン 広告終了' },
+  ];
+  const seedCalEvs = [
+    { id:'s1',  start:'2026-06-04', end:'2026-06-11', title:'スーパーSALE',       cat:'rakuten', color:'#BF0000', note:'' },
+    { id:'s2',  start:'2026-06-18', end:'2026-06-18', title:'ご愛顧感謝デー',      cat:'rakuten', color:'#FFB300', note:'' },
+    { id:'s3',  start:'2026-06-20', end:'2026-06-26', title:'マラソン',            cat:'rakuten', color:'#0050B3', note:'' },
+    { id:'s4',  start:'2026-06-05', end:'2026-06-05', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s5',  start:'2026-06-10', end:'2026-06-10', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s6',  start:'2026-06-15', end:'2026-06-15', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s7',  start:'2026-06-20', end:'2026-06-20', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s8',  start:'2026-06-25', end:'2026-06-25', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s9',  start:'2026-07-04', end:'2026-07-11', title:'マラソン',            cat:'rakuten', color:'#0050B3', note:'' },
+    { id:'s10', start:'2026-07-17', end:'2026-07-18', title:'ご愛顧感謝デー',      cat:'rakuten', color:'#FFB300', note:'' },
+    { id:'s11', start:'2026-07-19', end:'2026-07-26', title:'マラソン',            cat:'rakuten', color:'#0050B3', note:'' },
+    { id:'s12', start:'2026-07-05', end:'2026-07-05', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s13', start:'2026-07-10', end:'2026-07-10', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s14', start:'2026-07-15', end:'2026-07-15', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s15', start:'2026-07-20', end:'2026-07-20', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s16', start:'2026-07-25', end:'2026-07-25', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+    { id:'s17', start:'2026-07-30', end:'2026-07-30', title:'楽天カード感謝デー',  cat:'rakuten', color:'#E60012', note:'' },
+  ];
+  DATA_DOC.set({ entries: seedEntries, events: seedEvents, calEvents: seedCalEvs });
+  // onSnapshot will fire after set and call init()
+}
+
+// ─────────────────────────────────────────────
+// Meta広告CSVインポート
+// ─────────────────────────────────────────────
+function importCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const rows = parseMetaCSV(e.target.result);
+      if (rows.length === 0) { alert('有効なデータが見つかりませんでした'); return; }
+      let added = 0, skipped = 0;
+      rows.forEach(row => {
+        const idx = entries.findIndex(en => en.date === row.date);
+        if (idx >= 0) {
+          // 広告データだけ上書き
+          Object.assign(entries[idx], row);
+          skipped++;
+        } else {
+          entries.push(row);
+          added++;
+        }
+      });
+      entries.sort((a,b) => a.date.localeCompare(b.date));
+      saveEntries(entries);
+      renderAll();
+      alert(`取り込み完了：${added}件追加、${skipped}件更新（インプレッション0の日はスキップ済み）`);
+    } catch(err) {
+      alert('CSVの読み込みに失敗しました: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseMetaCSV(text) {
+  // quoted fields（改行含む）を正しくパース
+  const records = [];
+  let cur = '', inQuote = false, fields = [], rows = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') { inQuote = !inQuote; }
+    else if (ch === ',' && !inQuote) { fields.push(cur.trim()); cur = ''; }
+    else if ((ch === '\n' || (ch === '\r' && text[i+1] === '\n')) && !inQuote) {
+      if (ch === '\r') i++;
+      fields.push(cur.trim()); cur = '';
+      if (fields.length > 1) rows.push(fields);
+      fields = [];
+    } else { cur += ch; }
+  }
+  if (cur.trim()) { fields.push(cur.trim()); if (fields.length > 1) rows.push(fields); }
+
+  // ヘッダー行をスキップ
+  const dataRows = rows.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r[0]));
+
+  // 同日複数キャンペーンを合算
+  const byDate = {};
+  dataRows.forEach(r => {
+    const adImp = Number(r[10]) || 0;
+    if (adImp === 0) return;
+    const date   = r[0];
+    const clicks = Number(r[4]) || 0;
+    const budget = Number(r[9]) || 0;
+    const reach  = Number(r[11]) || 0;
+    if (!byDate[date]) byDate[date] = { clicks:0, adImp:0, budget:0, reach:0 };
+    byDate[date].clicks += clicks;
+    byDate[date].adImp  += adImp;
+    byDate[date].budget += budget;
+    byDate[date].reach  += reach;
+  });
+  const result = [];
+  Object.keys(byDate).sort().forEach(date => {
+    const v = byDate[date];
+    const ctr  = v.adImp > 0 ? parseFloat((v.clicks / v.adImp * 100).toFixed(2)) : null;
+    const cpc  = v.clicks > 0 ? Math.round(v.budget / v.clicks) : null;
+    const freq = v.reach  > 0 ? parseFloat((v.adImp / v.reach).toFixed(2)) : null;
+    result.push({ date, ctr, cpc, clicks: v.clicks, adImp: v.adImp, budget: v.budget, freq,
+      reach:null, imp:null, engage:null, saves:null, follower:null, profile:null, sales:null, visitors:null, igVisitors:null });
+  });
+  return result;
+}
+
+// ─────────────────────────────────────────────
+// カレンダー
+// ─────────────────────────────────────────────
+const CAT_COLOR = {
+  rakuten: '#BF0000',
+  coupon:  '#43A047',
+  point:   '#8E24AA',
+  ad:      '#F57C00',
+  sale:    '#BF0000',
+  marathon:'#0050B3',
+  thanks:  '#FFB300',
+  card:    '#E60012',
+};
+
+function loadCalEvents() {
+  return calEventsCache;
+}
+function saveCalEvents(arr) {
+  calEventsCache = arr;
+  DATA_DOC.set({ calEvents: arr }, { merge: true });
+}
+
+function seedCalEvents() {
+  // calEventsCache はonSnapshot or seedAndSave で設定済み
+  // 空の場合のみセット（通常はseedAndSaveが担当）
+  if (calEventsCache.length > 0) return;
+}
+
+let calYear, calMonth, calFilter = 'all', calSelectedDate = null, calView = 'gantt';
+let ganttCollapsed = new Set();
+
+function toggleGanttCat(key) {
+  if (ganttCollapsed.has(key)) ganttCollapsed.delete(key);
+  else ganttCollapsed.add(key);
+  renderGantt();
+}
+
+function setCalView(view) {
+  calView = view;
+  document.getElementById('view-btn-calendar').classList.toggle('active', view === 'calendar');
+  document.getElementById('view-btn-gantt').classList.toggle('active', view === 'gantt');
+  document.getElementById('calendar-view').style.display = view === 'calendar' ? 'block' : 'none';
+  document.getElementById('gantt-view').style.display    = view === 'gantt'    ? 'block' : 'none';
+  renderCalendar();
+}
+
+function initCalendar() {
+  seedCalEvents();
+  const now = new Date();
+  calYear  = now.getFullYear();
+  calMonth = now.getMonth();
+  setCalView(calView);
+}
+
+function setCalFilter(cat) {
+  calFilter = cat;
+  document.querySelectorAll('.cal-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.cat === cat);
+  });
+  renderCalendar();
+}
+
+function changeCalMonth(d) {
+  calMonth += d;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  calSelectedDate = null;
+  document.getElementById('cal-detail').style.display = 'none';
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const label = `${calYear}年 ${calMonth+1}月`;
+  document.getElementById('cal-month-label').textContent = label;
+
+  if (calView === 'gantt') { renderGantt(); return; }
+
+  const allEvents = loadCalEvents();
+  const filtered = calFilter === 'all' ? allEvents : allEvents.filter(e => e.cat === calFilter);
+
+  const weeksContainer = document.getElementById('cal-weeks');
+  weeksContainer.innerHTML = '';
+
+  const firstDay   = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+  const todayStr    = toDateStr(new Date());
+
+  // Build flat array of all cells
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) {
+    const d = daysInPrev - firstDay + 1 + i;
+    const pm = calMonth === 0 ? 12 : calMonth;
+    const py = calMonth === 0 ? calYear - 1 : calYear;
+    cells.push({ dateStr: `${py}-${String(pm).padStart(2,'0')}-${String(d).padStart(2,'0')}`, dayNum: d, otherMonth: true });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells.push({ dateStr, dayNum: d, otherMonth: false });
+  }
+  const nextPad = cells.length % 7 === 0 ? 0 : 7 - (cells.length % 7);
+  for (let i = 1; i <= nextPad; i++) {
+    const nm = calMonth === 11 ? 1 : calMonth + 2;
+    const ny = calMonth === 11 ? calYear + 1 : calYear;
+    cells.push({ dateStr: `${ny}-${String(nm).padStart(2,'0')}-${String(i).padStart(2,'0')}`, dayNum: i, otherMonth: true });
+  }
+
+  // Split into weeks
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  weeks.forEach(week => {
+    const weekStart = week[0].dateStr;
+    const weekEnd   = week[6].dateStr;
+
+    // Events overlapping this week
+    const weekEvents = filtered.filter(ev =>
+      ev.start && ev.end && ev.start <= weekEnd && ev.end >= weekStart
+    );
+    weekEvents.sort((a, b) => a.start < b.start ? -1 : a.start > b.start ? 1 :
+      (a.end > b.end ? -1 : 1)); // longer events first within same start
+
+    // Greedy lane assignment
+    const laneEnds = []; // last evEnd in each lane
+    const placed = weekEvents.map(ev => {
+      let lane = laneEnds.findIndex(lastEnd => lastEnd < ev.start);
+      if (lane === -1) { lane = laneEnds.length; laneEnds.push(''); }
+      laneEnds[lane] = ev.end;
+      return { ev, lane };
+    });
+
+    const block = document.createElement('div');
+    block.className = 'cal-week-block';
+
+    // Day cells row (top of block)
+    const daysRow = document.createElement('div');
+    daysRow.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:0;';
+    week.forEach(({ dateStr, dayNum, otherMonth }) => {
+      const dow = dateStr ? new Date(dateStr).getDay() : 0;
+      daysRow.appendChild(makeCalCell(dateStr, dayNum, otherMonth, dateStr === todayStr, dateStr === calSelectedDate, dow));
+    });
+    block.appendChild(daysRow);
+
+    // Event bars (below day numbers)
+    if (laneEnds.length > 0) {
+      const barsGrid = document.createElement('div');
+      barsGrid.className = 'cal-bars-row';
+      barsGrid.style.cssText = `display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(${laneEnds.length},22px);column-gap:0;row-gap:1px;`;
+
+      placed.forEach(({ ev, lane }) => {
+        let colStart = -1, colEnd = -1;
+        for (let i = 0; i < 7; i++) {
+          const d = week[i].dateStr;
+          if (!d) continue;
+          if (colStart === -1 && d >= ev.start) colStart = i;
+          if (d <= ev.end) colEnd = i;
+        }
+        if (colStart === -1 || colEnd === -1) return;
+
+        const isStart = ev.start >= weekStart;
+        const isEnd   = ev.end   <= weekEnd;
+
+        const bar = document.createElement('div');
+        bar.className = 'cal-event-bar' + (isStart ? ' bar-start' : '') + (isEnd ? ' bar-end' : '');
+        bar.style.cssText = `grid-column:${colStart+1}/${colEnd+2};grid-row:${lane+1};background:${ev.color||CAT_COLOR[ev.cat]||'#888'};`;
+        bar.textContent = isStart ? ev.title : '';
+        bar.title = ev.title;
+        bar.onclick = (e) => { e.stopPropagation(); selectCalDay(ev.start <= weekStart ? weekStart : ev.start); };
+        barsGrid.appendChild(bar);
+      });
+
+      block.appendChild(barsGrid);
+    }
+
+    weeksContainer.appendChild(block);
+  });
+
+  if (calSelectedDate) renderCalDetail(calSelectedDate);
+}
+
+function makeCalCell(dateStr, dayNum, otherMonth, isToday, isSelected, dow) {
+  const cell = document.createElement('div');
+  cell.className = 'cal-day' +
+    (otherMonth ? ' other-month' : '') +
+    (isToday    ? ' today' : '') +
+    (isSelected ? ' selected' : '');
+  if (dateStr) cell.onclick = () => selectCalDay(dateStr);
+  const wrap = document.createElement('div');
+  wrap.className = 'cal-day-num-wrap';
+  const numDiv = document.createElement('div');
+  numDiv.className = 'cal-day-num' + (dow===0?' sun':dow===6?' sat':'');
+  numDiv.textContent = dayNum;
+  wrap.appendChild(numDiv);
+  cell.appendChild(wrap);
+  return cell;
+}
+
+function selectCalDay(dateStr) {
+  calSelectedDate = dateStr;
+  renderCalendar();  // re-render to show selected state
+  renderCalDetail(dateStr);
+}
+
+function renderCalDetail(dateStr) {
+  const detail = document.getElementById('cal-detail');
+  detail.style.display = 'block';
+  const [y, m, d] = dateStr.split('-');
+  const dow = ['日','月','火','水','木','金','土'][new Date(dateStr).getDay()];
+  document.getElementById('cal-detail-date').textContent = `${y}年${Number(m)}月${Number(d)}日（${dow}）`;
+
+  const allEvents = loadCalEvents();
+  const filtered  = calFilter === 'all' ? allEvents : allEvents.filter(e => e.cat === calFilter);
+  const evs = filtered.filter(e => e.start <= dateStr && e.end >= dateStr);
+
+  const container = document.getElementById('cal-detail-events');
+  if (evs.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:#aaa;padding:6px 0;">イベントなし</div>';
+  } else {
+    container.innerHTML = evs.map(ev => `
+      <div class="cal-detail-event">
+        <div class="cal-detail-dot" style="background:${ev.color || CAT_COLOR[ev.cat] || '#888'}"></div>
+        <div class="cal-detail-title">${ev.title}${ev.note ? ' <span style="color:#aaa;font-size:11px;">— '+ev.note+'</span>' : ''}</div>
+        <div class="cal-detail-range">${ev.start === ev.end ? ev.start : ev.start+'〜'+ev.end}${ev.timeStart ? ' ' + ev.timeStart + (ev.timeEnd ? '〜'+ev.timeEnd : '') : ''}</div>
+        <button class="cal-detail-del" onclick="editCalEvent('${ev.id}')" style="color:#90CAF9;font-size:13px;">✏️</button>
+        <button class="cal-detail-del" onclick="deleteCalEvent('${ev.id}')">✕</button>
+      </div>`).join('');
+  }
+}
+
+function deleteCalEvent(id) {
+  if (!confirm('このイベントを削除しますか？')) return;
+  const arr = loadCalEvents().filter(e => e.id !== id);
+  saveCalEvents(arr);
+  renderCalendar();
+  if (calSelectedDate) renderCalDetail(calSelectedDate);
+}
+
+let calEditId = null;
+
+function editCalEvent(id) {
+  const ev = loadCalEvents().find(e => e.id === id);
+  if (!ev) return;
+  calEditId = id;
+  document.getElementById('cal-ev-start').value      = ev.start;
+  document.getElementById('cal-ev-end').value        = ev.end;
+  document.getElementById('cal-ev-title').value      = ev.title;
+  document.getElementById('cal-ev-cat').value        = ev.cat;
+  document.getElementById('cal-ev-time-start').value = ev.timeStart || '';
+  document.getElementById('cal-ev-time-end').value   = ev.timeEnd   || '';
+  document.getElementById('cal-ev-note').value       = ev.note      || '';
+  document.querySelector('#cal-modal h2').textContent = '✏️ イベントを編集';
+  document.getElementById('cal-modal').style.display = 'flex';
+}
+
+function openCalAddModal() {
+  calEditId = null;
+  document.querySelector('#cal-modal h2').textContent = '📅 イベントを追加';
+  document.getElementById('cal-ev-start').value = calSelectedDate || toDateStr(new Date());
+  document.getElementById('cal-ev-end').value        = calSelectedDate || toDateStr(new Date());
+  document.getElementById('cal-ev-title').value      = '';
+  document.getElementById('cal-ev-time-start').value = '';
+  document.getElementById('cal-ev-time-end').value   = '';
+  document.getElementById('cal-ev-note').value       = '';
+  // 既存タイトルをサジェスト候補に追加
+  const titles = [...new Set(loadCalEvents().map(e => e.title))].sort();
+  const dl = document.getElementById('cal-title-datalist');
+  dl.innerHTML = titles.map(t => `<option value="${t}">`).join('');
+  document.getElementById('cal-modal').style.display = 'flex';
+}
+function closeCalModal() {
+  document.getElementById('cal-modal').style.display = 'none';
+}
+function saveCalEvent() {
+  const start     = document.getElementById('cal-ev-start').value;
+  const end       = document.getElementById('cal-ev-end').value;
+  const title     = document.getElementById('cal-ev-title').value.trim();
+  const cat       = document.getElementById('cal-ev-cat').value;
+  const timeStart = document.getElementById('cal-ev-time-start').value;
+  const timeEnd   = document.getElementById('cal-ev-time-end').value;
+  const note      = document.getElementById('cal-ev-note').value.trim();
+  if (!start || !title) { alert('開始日とタイトルを入力してください'); return; }
+  const arr = loadCalEvents();
+  if (calEditId) {
+    const idx = arr.findIndex(e => e.id === calEditId);
+    if (idx !== -1) arr[idx] = { ...arr[idx], start, end: end || start, title, cat, color: CAT_COLOR[cat] || '#888', timeStart, timeEnd, note };
+  } else {
+    arr.push({ id: 'u' + Date.now(), start, end: end || start, title, cat, color: CAT_COLOR[cat] || '#888', timeStart, timeEnd, note });
+  }
+  saveCalEvents(arr);
+  closeCalModal();
+  renderCalendar();
+  if (calSelectedDate) renderCalDetail(calSelectedDate);
+}
+
+// ─────────────────────────────────────────────
+// ガントチャート描画
+// ─────────────────────────────────────────────
+// 日付文字列ユーティリティ（ローカル時刻ベース）
+function ganttPad(n){ return String(n).padStart(2,'0'); }
+function ganttFmt(d){ return d.getFullYear()+'-'+ganttPad(d.getMonth()+1)+'-'+ganttPad(d.getDate()); }
+function ganttEachDay(startStr, endStr){
+  const [sy,sm,sd] = startStr.split('-').map(Number);
+  const [ey,em,ed] = endStr.split('-').map(Number);
+  const out = []; let cur = new Date(sy, sm-1, sd); const end = new Date(ey, em-1, ed);
+  let guard = 0;
+  while (cur <= end && guard < 1000) { out.push(ganttFmt(cur)); cur.setDate(cur.getDate()+1); guard++; }
+  return out;
+}
+
+// タイトルでグループ化し、sortOrder順（→start順）で返す（グローバル）
+function groupByTitle(evs) {
+  const map = new Map();
+  evs.forEach(ev => {
+    if (!map.has(ev.title)) map.set(ev.title, []);
+    map.get(ev.title).push(ev);
+  });
+  const sorted = [...map.entries()].sort((a, b) => {
+    const ao = Math.min(...a[1].map(e => e.sortOrder ?? 9999));
+    const bo = Math.min(...b[1].map(e => e.sortOrder ?? 9999));
+    if (ao !== bo) return ao - bo;
+    return (a[1][0].start < b[1][0].start ? -1 : 1);
+  });
+  return new Map(sorted);
+}
+
+// カテゴリ内でタイトルグループを上下移動（グローバル）
+function moveGanttGroup(catKey, title, dir) {
+  const all = loadCalEvents();
+  const [rangeStart, rangeEnd] = getGanttRange(all.filter(e => e.start && e.end));
+  const catEvs = all.filter(e => e.cat === catKey && e.start && e.end
+    && e.start <= rangeEnd && e.end >= rangeStart);
+  const grouped = groupByTitle(catEvs);
+  const titles = [...grouped.keys()];
+  const idx = titles.indexOf(title);
+  const swapIdx = idx + dir;
+  if (idx === -1 || swapIdx < 0 || swapIdx >= titles.length) return;
+  const groupA = grouped.get(titles[idx]);
+  const groupB = grouped.get(titles[swapIdx]);
+  // sortOrderが未設定なら連番で初期化
+  const needInit = all.some(e => e.sortOrder === undefined);
+  if (needInit) {
+    let counter = 0;
+    titles.forEach(t => {
+      grouped.get(t).forEach(ev => {
+        const i = all.findIndex(e => e.id === ev.id);
+        if (i !== -1) all[i] = { ...all[i], sortOrder: counter };
+      });
+      counter++;
+    });
+  }
+  const orderA = Math.min(...groupA.map(e => { const found = all.find(x => x.id === e.id); return found?.sortOrder ?? idx; }));
+  const orderB = Math.min(...groupB.map(e => { const found = all.find(x => x.id === e.id); return found?.sortOrder ?? swapIdx; }));
+  all.forEach((e, i) => {
+    if (groupA.some(a => a.id === e.id)) all[i] = { ...e, sortOrder: orderB };
+    if (groupB.some(b => b.id === e.id)) all[i] = { ...e, sortOrder: orderA };
+  });
+  saveCalEvents(all);
+  renderGantt();
+}
+
+// 期間ボタン（chartPeriod）に応じてガントの表示範囲を決定
+function getGanttRange(events) {
+  const monthDim = new Date(calYear, calMonth + 1, 0).getDate();
+  const monthRange = [`${calYear}-${ganttPad(calMonth+1)}-01`, `${calYear}-${ganttPad(calMonth+1)}-${ganttPad(monthDim)}`];
+
+  if (chartPeriod === 'month') return monthRange;
+  if (chartPeriod === 'range') {
+    const s = document.getElementById('range-start')?.value;
+    const e = document.getElementById('range-end')?.value;
+    if (s && e && s <= e) return [s, e];
+  }
+  if (!events.length) return monthRange;
+
+  const sorted = events.slice().sort((a,b)=> a.start < b.start ? -1 : a.start > b.start ? 1 : 0);
+  let subset = sorted;
+  if (chartPeriod === 10 || chartPeriod === '10') subset = sorted.slice(-10);
+  else if (chartPeriod === 30 || chartPeriod === '30') subset = sorted.slice(-30);
+  // 'all' は全件
+  const start = subset.reduce((m,e)=> e.start < m ? e.start : m, subset[0].start);
+  const end   = subset.reduce((m,e)=> e.end   > m ? e.end   : m, subset[0].end);
+  return [start, end];
+}
+
+function renderGantt() {
+  const inner = document.getElementById('gantt-inner');
+  const todayStr = toDateStr(new Date());
+  const dowName = ['日','月','火','水','木','金','土'];
+  const CW = 26; // 1日あたりの幅(px)
+
+  const CAT_META = [
+    { key:'rakuten', label:'楽天',        color:CAT_COLOR.rakuten },
+    { key:'coupon',  label:'クーポン',     color:CAT_COLOR.coupon  },
+    { key:'point',   label:'ポイントアップ', color:CAT_COLOR.point   },
+    { key:'ad',      label:'広告',         color:CAT_COLOR.ad       },
+  ];
+
+  const all = loadCalEvents().filter(ev => ev.start && ev.end);
+  const [rangeStart, rangeEnd] = getGanttRange(all);
+
+  // ナビのラベルを範囲に合わせて更新
+  const lbl = document.getElementById('cal-month-label');
+  if (lbl) {
+    if (chartPeriod === 'month') lbl.textContent = `${calYear}年 ${calMonth+1}月`;
+    else lbl.textContent = `${rangeStart.replace(/-/g,'/').slice(0,7).replace('/','年')+'月'} 〜 ${rangeEnd.slice(0,7).replace('-','年')+'月'}`;
+  }
+
+  const days = ganttEachDay(rangeStart, rangeEnd);
+  const dayIndex = {}; days.forEach((d,i)=> dayIndex[d] = i);
+  const TLW = days.length * CW; // タイムライン全体幅
+
+  // 範囲に重なるイベント
+  const inRange = all
+    .filter(ev => ev.start <= rangeEnd && ev.end >= rangeStart)
+    .sort((a, b) => a.start < b.start ? -1 : a.start > b.start ? 1 : (a.end > b.end ? -1 : 1));
+
+  // 月ラベル行 ＋ 日付ヘッダー ＋ 背景セル
+  let monthRow = '', headCells = '', bgCells = '';
+  for (let i = 0; i < days.length; ) {
+    const ym = days[i].slice(0,7);
+    let j = i; while (j < days.length && days[j].slice(0,7) === ym) j++;
+    const [y, m] = ym.split('-');
+    monthRow += `<div class="gantt-month-cell" style="width:${(j-i)*CW}px;">${y}年${Number(m)}月</div>`;
+    i = j;
+  }
+  days.forEach((ds, i) => {
+    const w = new Date(ds.slice(0,4), Number(ds.slice(5,7))-1, ds.slice(8,10)).getDay();
+    const monthStart = ds.slice(8,10) === '01';
+    const cls = (w === 0 ? ' sun' : w === 6 ? ' sat' : '') + (ds === todayStr ? ' today' : '') + (monthStart && i>0 ? ' month-start' : '');
+    headCells += `<div class="gantt-cell${cls}">${Number(ds.slice(8,10))}<span class="g-dow">${dowName[w]}</span></div>`;
+    bgCells   += `<div class="gantt-cell${cls}"></div>`;
+  });
+
+  const grouped = (calFilter === 'all');
+  const labelW = grouped ? 184 : 150;
+
+  let html = `<div class="gantt-month-row">
+      <div class="gantt-label-col" style="width:${labelW}px;min-width:${labelW}px;background:#FAFAFA;"></div>
+      <div class="gantt-track" style="width:${TLW}px;">${monthRow}</div>
+    </div>
+    <div class="gantt-row gantt-head">
+      <div class="gantt-label-col" style="width:${labelW}px;min-width:${labelW}px;">イベント</div>
+      <div class="gantt-track" style="width:${TLW}px;">${headCells}</div>
+    </div>`;
+
+  if (inRange.length === 0) {
+    html += `<div class="gantt-empty">この期間に予定はありません</div>`;
+    inner.innerHTML = html;
+    return;
+  }
+
+  const grouped0 = (calFilter === 'all');
+  const displayed = grouped0 ? inRange : inRange.filter(e => e.cat === calFilter);
+
+  // 件数ヒートマップ：各日のイベント数（0件＝空白で空き日が一目で分かる）
+  const counts = new Array(days.length).fill(0);
+  displayed.forEach(ev => {
+    const s = ev.start < rangeStart ? rangeStart : ev.start;
+    const e = ev.end   > rangeEnd   ? rangeEnd   : ev.end;
+    for (let i = dayIndex[s]; i <= dayIndex[e]; i++) counts[i]++;
+  });
+  const maxC = Math.max(1, ...counts);
+  let densityCells = '';
+  days.forEach((ds, i) => {
+    const c = counts[i];
+    const op = c === 0 ? 0 : (0.18 + 0.82 * (c / maxC));
+    const monthStartCls = (ds.slice(8,10) === '01' && i > 0) ? ' month-start' : '';
+    const bg = c === 0 ? '' : `background:rgba(121,134,203,${op.toFixed(2)});`;
+    densityCells += `<div class="gantt-cell${monthStartCls}" style="${bg}" title="${ds}：${c}件">${c > 0 ? c : ''}</div>`;
+  });
+  html += `<div class="gantt-row gantt-density-row">
+      <div class="gantt-label-col" style="width:${labelW}px;min-width:${labelW}px;">件数</div>
+      <div class="gantt-track" style="width:${TLW}px;">${densityCells}</div>
+    </div>`;
+
+  // ↑↓ボタンHTML（catKey と title を渡す）
+  function sortBtns(catKey, title, idx, total) {
+    const t = title.replace(/'/g, "\\'");
+    const up   = idx > 0         ? `<button class="gantt-sort-btn" onclick="event.stopPropagation();moveGanttGroup('${catKey}','${t}',-1)" title="上へ">▲</button>` : `<button class="gantt-sort-btn" style="visibility:hidden">▲</button>`;
+    const down = idx < total - 1 ? `<button class="gantt-sort-btn" onclick="event.stopPropagation();moveGanttGroup('${catKey}','${t}',1)"  title="下へ">▼</button>` : `<button class="gantt-sort-btn" style="visibility:hidden">▼</button>`;
+    return `<div class="gantt-sort-btns">${up}${down}</div>`;
+  }
+
+  // 1イベント＝1行のバー（単独イベント用）
+  function eventRow(ev, indent, catKey, idx, total) {
+    const s = ev.start < rangeStart ? rangeStart : ev.start;
+    const e = ev.end   > rangeEnd   ? rangeEnd   : ev.end;
+    const si = dayIndex[s], ei = dayIndex[e];
+    if (si === undefined || ei === undefined) return '';
+    const left  = si * CW;
+    const width = (ei - si + 1) * CW;
+    const color = ev.color || CAT_COLOR[ev.cat] || '#888';
+    const bar = `<div class="gantt-bar" style="left:${left}px;width:${width-2}px;background:${color};"
+        title="${ev.title}（${ev.start}〜${ev.end}）" onclick="selectGanttEvent('${ev.id}')">${ev.title}</div>`;
+    const btns = catKey !== undefined ? sortBtns(catKey, ev.title, idx, total) : '';
+    return `<div class="gantt-row">
+        <div class="gantt-label-col${indent ? ' indent' : ''}" onclick="selectGanttEvent('${ev.id}')" style="cursor:pointer;">
+          <div class="gantt-label-dot" style="background:${color};"></div>
+          <div class="gantt-label-txt">${ev.title}</div>
+          ${btns}
+        </div>
+        <div class="gantt-track" style="width:${TLW}px;">${bgCells}${bar}</div>
+      </div>`;
+  }
+
+  // 同タイトル複数イベント＝1行に複数バー
+  function titleRow(title, evArr, indent, catKey, idx, total) {
+    const color = evArr[0].color || CAT_COLOR[evArr[0].cat] || '#888';
+    let bars = '';
+    evArr.forEach(ev => {
+      const s = ev.start < rangeStart ? rangeStart : ev.start;
+      const e = ev.end   > rangeEnd   ? rangeEnd   : ev.end;
+      const si = dayIndex[s], ei = dayIndex[e];
+      if (si === undefined || ei === undefined) return;
+      const left  = si * CW;
+      const width = (ei - si + 1) * CW;
+      bars += `<div class="gantt-bar" style="left:${left}px;width:${width-2}px;background:${color};"
+          title="${ev.title}（${ev.start}〜${ev.end}）" onclick="selectGanttEvent('${ev.id}')">${ev.title}</div>`;
+    });
+    const btns = catKey !== undefined ? sortBtns(catKey, title, idx, total) : '';
+    return `<div class="gantt-row">
+        <div class="gantt-label-col${indent ? ' indent' : ''}" style="cursor:default;">
+          <div class="gantt-label-dot" style="background:${color};"></div>
+          <div class="gantt-label-txt">${title}</div>
+          ${btns}
+        </div>
+        <div class="gantt-track" style="width:${TLW}px;">${bgCells}${bars}</div>
+      </div>`;
+  }
+
+  // カテゴリブロック（展開時＝縦書き見出し／折りたたみ時＝1行に詰める）
+  function catBlock(meta, evs, key) {
+    const byTitle = groupByTitle(evs);
+    if (ganttCollapsed.has(key)) {
+      return `<div class="gantt-row gantt-cat-collapsed" onclick="toggleGanttCat('${key}')">
+          <div class="gantt-label-col" style="width:${labelW}px;min-width:${labelW}px;">
+            <span class="gantt-cat-caret">＋</span>
+            <span class="gantt-label-dot" style="background:${meta.color};"></span>${meta.label}（${byTitle.size}種類）
+          </div>
+          <div class="gantt-track" style="width:${TLW}px;">${bgCells}</div>
+        </div>`;
+    }
+    const entries = [...byTitle.entries()];
+    const rows = entries.map(([title, arr], i) =>
+      arr.length === 1
+        ? eventRow(arr[0], true, key, i, entries.length)
+        : titleRow(title, arr, true, key, i, entries.length)
+    ).join('');
+    return `<div class="gantt-cat-block">
+        <div class="gantt-cat-vlabel" onclick="toggleGanttCat('${key}')" title="クリックで折りたたみ">
+          <span class="gantt-cat-caret">−</span>
+          <span class="gantt-label-dot" style="background:${meta.color};"></span>${meta.label}
+        </div>
+        <div class="gantt-cat-events">${rows}</div>
+      </div>`;
+  }
+
+  if (grouped) {
+    CAT_META.forEach(meta => {
+      const evs = inRange.filter(e => e.cat === meta.key);
+      if (evs.length > 0) html += catBlock(meta, evs, meta.key);
+    });
+    const known = CAT_META.map(m => m.key);
+    const others = inRange.filter(e => !known.includes(e.cat));
+    if (others.length > 0) html += catBlock({ label:'その他', color:'#888' }, others, 'other');
+  } else {
+    const filtered = inRange.filter(e => e.cat === calFilter);
+    const byTitle = groupByTitle(filtered);
+    const entries = [...byTitle.entries()];
+    entries.forEach(([title, arr], i) => {
+      html += arr.length === 1
+        ? eventRow(arr[0], false, calFilter, i, entries.length)
+        : titleRow(title, arr, false, calFilter, i, entries.length);
+    });
+  }
+
+  inner.innerHTML = html;
+}
+
+function selectGanttEvent(id) {
+  const ev = loadCalEvents().find(e => e.id === id);
+  if (ev) editCalEvent(id);
+}
+
+// ─────────────────────────────────────────────
+// 起動（Firestoreのonsnapshotで自動実行）
+// ─────────────────────────────────────────────
+// init() は DATA_DOC.onSnapshot 内から呼ばれる
+</script>
+</body>
+</html>
