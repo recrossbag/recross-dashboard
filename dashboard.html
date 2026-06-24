@@ -1768,7 +1768,6 @@ function importCSV(input) {
 
 function parseMetaCSV(text) {
   // quoted fields（改行含む）を正しくパース
-  const records = [];
   let cur = '', inQuote = false, fields = [], rows = [];
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
@@ -1777,37 +1776,66 @@ function parseMetaCSV(text) {
     else if ((ch === '\n' || (ch === '\r' && text[i+1] === '\n')) && !inQuote) {
       if (ch === '\r') i++;
       fields.push(cur.trim()); cur = '';
-      if (fields.length > 1) rows.push(fields);
+      if (fields.some(f => f !== '')) rows.push(fields);
       fields = [];
     } else { cur += ch; }
   }
-  if (cur.trim()) { fields.push(cur.trim()); if (fields.length > 1) rows.push(fields); }
+  if (cur.trim()) { fields.push(cur.trim()); if (fields.some(f => f !== '')) rows.push(fields); }
 
-  // ヘッダー行をスキップ
-  const dataRows = rows.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r[0]));
+  if (rows.length < 2) return [];
+
+  // ヘッダー行からカラムインデックスを取得
+  const header = rows[0].map(h => h.replace(/"/g,'').trim());
+  function findCol(...candidates) {
+    for (const c of candidates) {
+      const idx = header.findIndex(h => h.includes(c));
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+  const colDate   = findCol('レポート開始', 'Date');
+  const colImp    = findCol('インプレッション');
+  const colClicks = findCol('リンククリック数');
+  const colBudget = findCol('消化金額');
+  const colReach  = findCol('リーチ');
+  const colFreq   = findCol('フリークエンシー');
+
+  // 日付の正規化：YYYY/M/D または YYYY-M-D → YYYY-MM-DD
+  function normalizeDate(d) {
+    if (!d) return null;
+    const m = d.replace(/"/g,'').trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (!m) return null;
+    return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  }
+
+  // データ行：日付が取れる行のみ
+  const dataRows = rows.slice(1).filter(r => normalizeDate(r[colDate] ?? r[0]));
 
   // 同日複数キャンペーンを合算
   const byDate = {};
   dataRows.forEach(r => {
-    const adImp = Number(r[10]) || 0;
+    const adImp = Number(r[colImp]) || 0;
     if (adImp === 0) return;
-    const date   = r[0];
-    const clicks = Number(r[4]) || 0;
-    const budget = Number(r[9]) || 0;
-    const reach  = Number(r[11]) || 0;
-    if (!byDate[date]) byDate[date] = { clicks:0, adImp:0, budget:0, reach:0 };
+    const date   = normalizeDate(r[colDate] ?? r[0]);
+    const clicks = Number(r[colClicks]) || 0;
+    const budget = Number(r[colBudget]) || 0;
+    const reach  = Number(r[colReach])  || 0;
+    const freq   = Number(r[colFreq])   || 0;
+    if (!byDate[date]) byDate[date] = { clicks:0, adImp:0, budget:0, reach:0, freqSum:0, freqN:0 };
     byDate[date].clicks += clicks;
     byDate[date].adImp  += adImp;
     byDate[date].budget += budget;
     byDate[date].reach  += reach;
+    if (freq > 0) { byDate[date].freqSum += freq; byDate[date].freqN++; }
   });
+
   const result = [];
   Object.keys(byDate).sort().forEach(date => {
     const v = byDate[date];
     const ctr  = v.adImp > 0 ? parseFloat((v.clicks / v.adImp * 100).toFixed(2)) : null;
     const cpc  = v.clicks > 0 ? Math.round(v.budget / v.clicks) : null;
-    const freq = v.reach  > 0 ? parseFloat((v.adImp / v.reach).toFixed(2)) : null;
-    result.push({ date, ctr, cpc, clicks: v.clicks, adImp: v.adImp, budget: v.budget, freq,
+    const freq = v.freqN  > 0 ? parseFloat((v.freqSum / v.freqN).toFixed(2)) : null;
+    result.push({ date, ctr, cpc, clicks: v.clicks, adImp: v.adImp, budget: Math.round(v.budget), freq,
       reach:null, imp:null, engage:null, saves:null, follower:null, profile:null, sales:null, visitors:null, igVisitors:null });
   });
   return result;
