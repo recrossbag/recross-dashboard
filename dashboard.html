@@ -80,6 +80,16 @@
 
     /* ── Chart ── */
     .chart-wrap { background: #fff; border-radius: 12px; border: 1px solid #EBEBEB; padding: 20px; margin-bottom: 16px; }
+    .chart-wrap h3 { display:flex; align-items:center; gap:6px; margin:0 0 14px; font-size:13px; font-weight:700; }
+    /* ツールチップ */
+    .tip { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:#E8E8E8; color:#888; font-size:10px; font-weight:700; cursor:help; position:relative; flex-shrink:0; margin-left:auto; }
+    .tip::after { content:attr(data-tip); position:absolute; top:22px; right:0; background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:260px; white-space:normal; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
+    .tip:hover::after { display:block; }
+    .tip-left::after { right:auto; left:0; }
+    .kpi-card { position:relative; }
+    .kpi-tip { position:absolute; top:8px; right:8px; display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:#EEEEEE; color:#aaa; font-size:9px; font-weight:700; cursor:help; }
+    .kpi-tip::after { content:attr(data-tip); position:absolute; top:18px; right:0; background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:240px; white-space:normal; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
+    .kpi-tip:hover::after { display:block; }
     .data-table-section { background:#fff; border-radius:12px; border:1px solid #EBEBEB; padding:20px; margin-bottom:16px; }
     .data-table-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
     .data-table-wrap { overflow-x:auto; }
@@ -312,6 +322,7 @@
     <div class="tab" onclick="switchTab('calendar')">📅 カレンダー</div>
     <div class="tab active" onclick="switchTab('sales')">🛒 売上・アクセス</div>
     <div class="tab" onclick="switchTab('ad')">📣 インスタ広告</div>
+    <div class="tab" onclick="switchTab('correlation')">📊 相関分析</div>
     <div class="tab" onclick="switchTab('history')">📋 履歴</div>
   </div>
 
@@ -343,15 +354,15 @@
     <div class="kpi-period" id="kpi-ad-period"></div>
     <div class="kpi-row" id="kpi-ad"></div>
     <div class="chart-wrap">
-      <h3>CTR推移（目標：1.5%）</h3>
+      <h3>CTR推移（目標：1.5%）<span class="tip" data-tip="クリック率の日別推移。広告を見た人のうちクリックした割合。1.5%以上が目標。出所：Meta広告マネージャ CSV">?</span></h3>
       <canvas id="chart-ctr" height="80"></canvas>
     </div>
     <div class="chart-wrap">
-      <h3>CPC推移（目標：¥30以下）</h3>
+      <h3>CPC推移（目標：¥30以下）<span class="tip" data-tip="クリック単価の日別推移。1クリックにかかった広告費。¥30以下が目標。出所：Meta広告マネージャ CSV">?</span></h3>
       <canvas id="chart-cpc" height="80"></canvas>
     </div>
     <div class="chart-wrap">
-      <h3>クリック数・インプレッション</h3>
+      <h3>クリック数・インプレッション<span class="tip" data-tip="棒グラフ（左軸）：広告クリック数。折れ線（右軸）：広告が表示された回数（インプレッション）。出所：Meta広告マネージャ CSV">?</span></h3>
       <canvas id="chart-clicks" height="80"></canvas>
     </div>
     <div class="data-table-section" id="ad-table-section">
@@ -368,31 +379,16 @@
     <div class="kpi-period" id="kpi-sales-period"></div>
     <div class="kpi-row" id="kpi-sales"></div>
     <div class="chart-wrap">
-      <h3>売上推移</h3>
+      <h3>売上推移<span class="tip" data-tip="楽天市場の日別売上金額。出所：楽天RMS「データダウンロード＞店舗データ」CSVを取り込むと自動入力されます">?</span></h3>
       <canvas id="chart-sales" height="80"></canvas>
     </div>
     <div class="chart-wrap">
-      <h3>楽天アクセス・流入推移</h3>
+      <h3>楽天アクセス・流入推移<span class="tip" data-tip="灰色：楽天全体アクセス数。オレンジ：Instagramから楽天への流入数。紫：楽天サーチ経由の流入数。出所：楽天RMS CSV＋手入力">?</span></h3>
       <canvas id="chart-visitors" height="80"></canvas>
     </div>
     <div class="chart-wrap">
-      <h3>アクセス内訳（楽天外 / 楽天内 / Instagram）</h3>
+      <h3>アクセス内訳（楽天外 / 楽天内 / Instagram）<span class="tip tip-left" data-tip="楽天外：Google検索やSNSなど楽天外からの流入（IG流入を含む）。楽天内：楽天サーチや楽天内リンクからの流入（サーチ流入を含む）。出所：楽天RMS「参照元・検索キーワード分析」を手入力">?</span></h3>
       <canvas id="chart-access-breakdown" height="80"></canvas>
-    </div>
-    <!-- 広告との相関 -->
-    <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;color:#888;text-transform:uppercase;margin:24px 0 10px;">📣 広告との相関</div>
-    <div class="kpi-row" id="kpi-roas"></div>
-    <div class="chart-wrap">
-      <h3>売上 vs 広告クリック数（2軸）</h3>
-      <canvas id="chart-sales-vs-clicks" height="80"></canvas>
-    </div>
-    <div class="chart-wrap">
-      <h3>ROAS推移（売上 ÷ 広告費）</h3>
-      <canvas id="chart-roas" height="80"></canvas>
-    </div>
-    <div class="chart-wrap">
-      <h3>IG流入 vs 売上（散布図）</h3>
-      <canvas id="chart-scatter" height="80"></canvas>
     </div>
     <div class="data-table-section" id="sales-table-section">
       <div class="data-table-header">
@@ -400,6 +396,24 @@
         <button class="entry-btn" onclick="exportCSV('sales')" style="margin:0;padding:6px 14px;font-size:12px;">⬇ CSVエクスポート</button>
       </div>
       <div class="data-table-wrap" id="sales-table-wrap"></div>
+    </div>
+  </div>
+
+  <!-- 相関分析タブ -->
+  <div class="tab-content" id="tab-correlation">
+    <div class="kpi-period" id="kpi-corr-period"></div>
+    <div class="kpi-row" id="kpi-roas"></div>
+    <div class="chart-wrap">
+      <h3>売上 vs 広告クリック数（2軸）<span class="tip" data-tip="棒グラフ（左軸）：楽天売上。折れ線（右軸）：Meta広告クリック数。広告を強化した日の数日後に売上が上がっているか確認するためのグラフ。出所：楽天RMS CSV＋Meta広告 CSV">?</span></h3>
+      <canvas id="chart-sales-vs-clicks" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>ROAS推移（売上 ÷ 広告費）<span class="tip" data-tip="ROAS（ロアス）＝広告費対売上比率。広告1円あたり何円売れたかを示す。1000%＝10倍の売上。広告費¥100未満の日は除外。出所：楽天RMS CSV＋Meta広告 CSV">?</span></h3>
+      <canvas id="chart-roas" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>IG流入 vs 売上（散布図）<span class="tip tip-left" data-tip="横軸：IG→楽天への流入人数。縦軸：その日の売上。点が右上に集まるほどIGからの流入が売上に結びついていることを示す。IG流入データを手入力で蓄積するほど精度が上がります。">?</span></h3>
+      <canvas id="chart-scatter" height="80"></canvas>
     </div>
   </div>
 
@@ -856,10 +870,12 @@ function renderKPIs() {
   const periodTxt = P.length
     ? `📅 期間：${mdShort(P[0].date)}〜${mdShort(P[P.length-1].date)}（${P.length}日分の合計・平均）`
     : 'データがありません';
-  const pAd = document.getElementById('kpi-ad-period');
-  const pSa = document.getElementById('kpi-sales-period');
-  if (pAd) pAd.textContent = periodTxt;
-  if (pSa) pSa.textContent = periodTxt;
+  const pAd   = document.getElementById('kpi-ad-period');
+  const pSa   = document.getElementById('kpi-sales-period');
+  const pCorr = document.getElementById('kpi-corr-period');
+  if (pAd)   pAd.textContent   = periodTxt;
+  if (pSa)   pSa.textContent   = periodTxt;
+  if (pCorr) pCorr.textContent = periodTxt;
 
   // ── 広告KPI（期間合計／加重平均）──
   const tClicks = sum('clicks'), tImp = sum('adImp'), tBudget = sum('budget');
@@ -868,12 +884,12 @@ function renderKPIs() {
   const freqVals = P.map(e => e.freq).filter(v => v != null && v !== '');
   const freq = freqVals.length ? freqVals.reduce((s, v) => s + Number(v), 0) / freqVals.length : null;
   document.getElementById('kpi-ad').innerHTML = [
-    kpiCard('CTR（平均）', ctr, 2, '%', '目標 1.5%↑', v => v >= 1.5 ? 'ok' : v >= 1.0 ? 'warn' : 'bad'),
-    kpiCard('CPC（平均）', cpc, 0, '¥', '目標 ¥30↓', v => v <= 30 ? 'ok' : v <= 40 ? 'warn' : 'bad'),
-    kpiCard('クリック数（合計）', tClicks, 0, '回', '', null),
-    kpiCard('インプレッション（合計）', tImp, 0, '回', '', null),
-    kpiCard('消化予算（合計）', tBudget, 0, '¥', '', null),
-    kpiCard('フリークエンシー（平均）', freq, 1, '回', '3超えで要注意', v => v < 2 ? 'ok' : v < 3 ? 'warn' : 'bad'),
+    kpiCard('CTR（平均）', ctr, 2, '%', '目標 1.5%↑', v => v >= 1.5 ? 'ok' : v >= 1.0 ? 'warn' : 'bad', null, 'クリック率（Click Through Rate）\n広告を見た人のうちクリックした割合。\n計算：クリック数 ÷ インプレッション × 100\n出所：Meta広告マネージャ CSV\n目標：1.5%以上'),
+    kpiCard('CPC（平均）', cpc, 0, '¥', '目標 ¥30↓', v => v <= 30 ? 'ok' : v <= 40 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV\n目標：¥30以下'),
+    kpiCard('クリック数（合計）', tClicks, 0, '回', '', null, null, '広告をクリックした回数の合計。\n出所：Meta広告マネージャ CSV'),
+    kpiCard('インプレッション（合計）', tImp, 0, '回', '', null, null, '広告が表示された回数の合計。\n同じ人に複数回表示されてもカウント。\n出所：Meta広告マネージャ CSV'),
+    kpiCard('消化予算（合計）', tBudget, 0, '¥', '', null, null, '期間中に使用した広告費の合計。\n出所：Meta広告マネージャ CSV'),
+    kpiCard('フリークエンシー（平均）', freq, 1, '回', '3超えで要注意', v => v < 2 ? 'ok' : v < 3 ? 'warn' : 'bad', null, '同じ人に広告が表示された平均回数。\n3回を超えると「見飽き」が起きやすくなり\nCTRが下がる傾向があります。\n出所：Meta広告マネージャ CSV'),
   ].join('');
 
   // ── 売上・アクセスKPI（期間合計＋本物のCVR・客単価）──
@@ -881,11 +897,11 @@ function renderKPIs() {
   const cvr = (tVis > 0 && tOrders > 0) ? (tOrders / tVis * 100) : null;   // 転換率(%) ＝ 売上件数 ÷ アクセス人数（件数未取込なら—）
   const aov = tOrders > 0 ? Math.round(tSales / tOrders) : null; // 客単価(円) ＝ 売上金額 ÷ 売上件数
   document.getElementById('kpi-sales').innerHTML = [
-    kpiCard('売上金額（合計）', tSales, 0, '¥', '', null),
-    kpiCard('楽天 全体アクセス（合計）', tVis, 0, '人', '', null),
-    kpiCard('転換率（CVR）', cvr, 2, '%', '売上件数÷アクセス', v => v >= 3 ? 'ok' : v >= 1.5 ? 'warn' : 'bad'),
-    kpiCard('客単価', aov, 0, '¥', '売上÷売上件数', null),
-    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null),
+    kpiCard('売上金額（合計）', tSales, 0, '¥', '', null, null, '楽天市場の売上金額の合計。\n出所：楽天RMS「データダウンロード＞店舗データ」CSV'),
+    kpiCard('楽天 全体アクセス（合計）', tVis, 0, '人', '', null, null, '楽天市場の店舗ページへのアクセス人数（ユニーク）。\n出所：楽天RMS「データダウンロード＞店舗データ」CSV'),
+    kpiCard('転換率（CVR）', cvr, 2, '%', '売上件数÷アクセス', v => v >= 3 ? 'ok' : v >= 1.5 ? 'warn' : 'bad', null, '購入転換率（Conversion Rate）\nアクセスした人のうち実際に購入した割合。\n計算：売上件数 ÷ アクセス人数 × 100\n出所：楽天RMS CSV（楽天CSVを取り込んだ場合のみ表示）'),
+    kpiCard('客単価', aov, 0, '¥', '売上÷売上件数', null, null, '1件の注文あたりの平均売上金額。\n計算：売上金額 ÷ 売上件数\n出所：楽天RMS CSV'),
+    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null, null, 'InstagramからQRコードや広告経由で\n楽天ショップに来たアクセス人数。\n出所：楽天RMS「参照元・検索キーワード分析」\nInstagramの行をダッシュボードに手入力'),
   ].join('');
 
   // ROAS・広告効果KPI（tBudget・tClicksは上の広告KPI計算済みの変数を流用）
@@ -893,20 +909,22 @@ function renderKPIs() {
   const igPerClick = (tClicks > 0 && tIg > 0) ? parseFloat((tIg / tClicks * 100).toFixed(1)) : null;
   const roasEl = document.getElementById('kpi-roas');
   if (roasEl) roasEl.innerHTML = [
-    kpiCard('ROAS', roas, 0, '%', '売上÷広告費（目標1000%↑）', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad'),
-    kpiCard('広告費（合計）', tBudget, 0, '¥', '', null),
-    kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷広告クリック', null),
-    kpiCard('クリック単価（CPC）', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad'),
+    kpiCard('ROAS', roas, 0, '%', '目標 1000%↑', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, '広告費対売上比率（Return On Ad Spend）\n広告1円あたり何円の売上が得られたか。\n計算：売上金額 ÷ 広告費 × 100\n1000%＝広告費の10倍売れた状態。\n出所：売上（楽天RMS CSV）＋広告費（Meta CSV）'),
+    kpiCard('広告費（合計）', tBudget, 0, '¥', '', null, null, '期間中に使用したMeta（Instagram）広告費の合計。\n出所：Meta広告マネージャ CSV'),
+    kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷広告クリック', null, null, '広告をクリックした人のうち\n実際に楽天ショップへ流入した割合。\n計算：IG→楽天流入数 ÷ 広告クリック数 × 100\n出所：Meta CSV ＋ 楽天RMS手入力'),
+    kpiCard('クリック単価（CPC）', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
   ].join('');
 }
 
-function kpiCard(label, value, decimals, unit, target, colorFn, wow) {
+function kpiCard(label, value, decimals, unit, target, colorFn, wow, tip) {
   const na   = value == null || value === '';
   const num  = na ? null : Number(value);
   const disp = na ? '—' : (unit === '¥' ? `¥${num.toLocaleString()}` : `${decimals != null ? num.toFixed(decimals) : num.toLocaleString()}${unit}`);
   let cls = 'na';
   if (!na && colorFn) cls = colorFn(num);
+  const tipHtml = tip ? `<span class="kpi-tip" data-tip="${tip.replace(/"/g,'&quot;')}">?</span>` : '';
   return `<div class="kpi-card ${cls}">
+    ${tipHtml}
     <div class="kpi-label">${label}</div>
     <div style="display:flex;align-items:baseline;gap:6px;">
       <div class="kpi-value">${disp}</div>
@@ -1061,7 +1079,7 @@ function renderCharts() {
   // ── 広告×売上 相関チャート ──
   const roasData = d.map(e => {
     const s = Number(e.sales)||0, b = Number(e.budget)||0;
-    return (s > 0 && b > 0) ? Math.round(s / b * 100) : null;
+    return (s > 0 && b >= 100) ? Math.round(s / b * 100) : null; // 広告費¥100未満の日は除外
   });
   makeChart('chart-sales-vs-clicks', 'bar', [
     { label:'売上(¥)', data: d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.6)', yAxisID:'y' },
