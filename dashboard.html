@@ -1013,9 +1013,10 @@ function renderCharts() {
     { label:'楽天サーチ流入', data: d.map(e=>e.searchVisitors||null), borderColor:'#7986CB', backgroundColor:'rgba(121,134,203,0.08)', tension:0.3, fill:true },
   ]);
   makeChart('chart-access-breakdown', 'bar', [
-    { label:'🌐 楽天外アクセス', data: d.map(e=>e.extVisitors||null), backgroundColor:'rgba(255,112,67,0.7)', stack:'s' },
-    { label:'🏪 楽天内アクセス', data: d.map(e=>e.intVisitors||null), backgroundColor:'rgba(38,166,154,0.7)', stack:'s' },
-    { label:'📸 Instagram流入', data: d.map(e=>e.igVisitors||null), backgroundColor:'rgba(233,30,99,0.7)', stack:'s' },
+    { label:'🌐 楽天外（IG以外）',   data: d.map(e=>Math.max(0,(e.extVisitors||0)-(e.igVisitors||0))||null),    backgroundColor:'rgba(255,112,67,0.5)', stack:'ext' },
+    { label:'📸 IG流入（楽天外の一部）', data: d.map(e=>e.igVisitors||null),                                   backgroundColor:'rgba(233,30,99,0.85)',  stack:'ext' },
+    { label:'🏪 楽天内（サーチ以外）', data: d.map(e=>Math.max(0,(e.intVisitors||0)-(e.searchVisitors||0))||null), backgroundColor:'rgba(38,166,154,0.5)',  stack:'int' },
+    { label:'🔍 サーチ流入（楽天内の一部）', data: d.map(e=>e.searchVisitors||null),                           backgroundColor:'rgba(121,134,203,0.85)', stack:'int' },
   ], { scales: { x: { stacked:true }, y: { stacked:true } } });
 
   renderDataTables();
@@ -1067,10 +1068,10 @@ function renderDataTables() {
         const s = Number(r.sales)||0, ord = Number(r.orders)||0;
         return ord>0 ? '¥'+Math.round(s/ord).toLocaleString() : '—';
       }, sum: false },
-    { key:'igVisitors',    head:'IG流入',          fmt: r => fmt(r.igVisitors,''),    sum:'sum' },
-    { key:'extVisitors',   head:'楽天外',          fmt: r => fmt(r.extVisitors,''),   sum:'sum' },
-    { key:'intVisitors',   head:'楽天内',          fmt: r => fmt(r.intVisitors,''),   sum:'sum' },
-    { key:'searchVisitors',head:'サーチ流入',      fmt: r => fmt(r.searchVisitors,''),sum:'sum' },
+    { key:'extVisitors',   head:'楽天外（合計）',   fmt: r => fmt(r.extVisitors,''),                                                           sum:'sum' },
+    { key:'igVisitors',    head:'└ IG流入',        fmt: r => fmt(r.igVisitors,''),    sum:'sum', sub:true },
+    { key:'intVisitors',   head:'楽天内（合計）',   fmt: r => fmt(r.intVisitors,''),                                                          sum:'sum' },
+    { key:'searchVisitors',head:'└ サーチ流入',    fmt: r => fmt(r.searchVisitors,''),sum:'sum', sub:true },
   ];
   buildTable('sales-table-wrap', d, salesCols);
 }
@@ -1108,11 +1109,13 @@ function buildTable(wrapperId, rows, cols) {
 
   // データ行（指標ごと）
   const dataRows = cols.filter(c => c.key !== 'date').map(c => {
-    const tds = rows.map(r => `<td>${c.fmt(r)}</td>`).join('');
+    const subStyle = c.sub ? 'color:#999;font-size:10px;' : '';
+    const tdStyle  = c.sub ? 'color:#aaa;' : '';
+    const tds = rows.map(r => `<td style="${tdStyle}">${c.fmt(r)}</td>`).join('');
     const sumTd = c.sum
-      ? `<td style="font-weight:700;background:#F1F8E9;color:#388E3C">${fmtTotal(c)}</td>`
+      ? `<td style="font-weight:700;background:#F1F8E9;color:${c.sub?'#aaa':'#388E3C'}">${fmtTotal(c)}</td>`
       : '<td>—</td>';
-    return `<tr><th>${c.head}</th>${tds}${sumTd}</tr>`;
+    return `<tr><th style="${subStyle}">${c.head}</th>${tds}${sumTd}</tr>`;
   }).join('');
 
   wrap.innerHTML = `<table>
