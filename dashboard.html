@@ -405,9 +405,21 @@
       <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FFB300"></div>ご愛顧感謝デー</div>
       <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#0050B3"></div>マラソン</div>
       <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#E60012"></div>楽天カード日</div>
-      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#43A047"></div>クーポン</div>
-      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#8E24AA"></div>ポイントアップ</div>
-      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#F57C00"></div>広告</div>
+      <div class="cal-legend-item" title="クリックで色変更">
+        <div id="legend-dot-coupon" class="cal-legend-dot" style="background:#43A047;cursor:pointer;" onclick="document.getElementById('color-picker-coupon').click()"></div>
+        クーポン
+        <input type="color" id="color-picker-coupon" value="#43A047" style="display:none" onchange="updateCatColor('coupon',this.value)">
+      </div>
+      <div class="cal-legend-item" title="クリックで色変更">
+        <div id="legend-dot-point" class="cal-legend-dot" style="background:#8E24AA;cursor:pointer;" onclick="document.getElementById('color-picker-point').click()"></div>
+        ポイントアップ
+        <input type="color" id="color-picker-point" value="#8E24AA" style="display:none" onchange="updateCatColor('point',this.value)">
+      </div>
+      <div class="cal-legend-item" title="クリックで色変更">
+        <div id="legend-dot-ad" class="cal-legend-dot" style="background:#F57C00;cursor:pointer;" onclick="document.getElementById('color-picker-ad').click()"></div>
+        広告
+        <input type="color" id="color-picker-ad" value="#F57C00" style="display:none" onchange="updateCatColor('ad',this.value)">
+      </div>
     </div>
     <div class="cal-nav">
       <button class="cal-nav-btn" onclick="changeCalMonth(-1)">◀</button>
@@ -697,6 +709,8 @@ DATA_DOC.onSnapshot(doc => {
   entries        = data.entries        || [];
   events         = data.events         || [];
   calEventsCache = data.calEvents      || [];
+  customCatColors = data.catColors    || {};
+  applyCatColorToLegend();
   // 自動修復：日付フォーマット重複・空行を一度だけ整理（修復不要なら何もしない＝ループしない）
   if (needsEntryRepair(entries)) {
     entries = dedupeEntries(entries)
@@ -2049,6 +2063,29 @@ const CAT_COLOR = {
   thanks:  '#FFB300',
   card:    '#E60012',
 };
+// ユーザーがカスタマイズ可能な色（Firestoreに保存）
+let customCatColors = {};
+function getCatColor(cat) {
+  return customCatColors[cat] || CAT_COLOR[cat] || '#888';
+}
+function saveCustomCatColors() {
+  DATA_DOC.set({ catColors: customCatColors }, { merge: true });
+}
+function applyCatColorToLegend() {
+  ['coupon','point','ad'].forEach(cat => {
+    const dot = document.getElementById('legend-dot-' + cat);
+    if (dot) dot.style.background = getCatColor(cat);
+    const inp = document.getElementById('color-picker-' + cat);
+    if (inp) inp.value = getCatColor(cat);
+  });
+}
+function updateCatColor(cat, color) {
+  customCatColors[cat] = color;
+  saveCustomCatColors();
+  applyCatColorToLegend();
+  renderGantt();
+  if (typeof renderCalendar === 'function') renderCalendar();
+}
 
 function loadCalEvents() {
   return calEventsCache;
@@ -2200,7 +2237,7 @@ function renderCalendar() {
 
         const bar = document.createElement('div');
         bar.className = 'cal-event-bar' + (isStart ? ' bar-start' : '') + (isEnd ? ' bar-end' : '');
-        bar.style.cssText = `grid-column:${colStart+1}/${colEnd+2};grid-row:${lane+1};background:${ev.color||CAT_COLOR[ev.cat]||'#888'};`;
+        bar.style.cssText = `grid-column:${colStart+1}/${colEnd+2};grid-row:${lane+1};background:${ev.color||getCatColor(ev.cat)||'#888'};`;
         bar.textContent = isStart ? ev.title : '';
         bar.title = ev.title;
         bar.onclick = (e) => { e.stopPropagation(); selectCalDay(ev.start <= weekStart ? weekStart : ev.start); };
@@ -2256,7 +2293,7 @@ function renderCalDetail(dateStr) {
   } else {
     container.innerHTML = evs.map(ev => `
       <div class="cal-detail-event">
-        <div class="cal-detail-dot" style="background:${ev.color || CAT_COLOR[ev.cat] || '#888'}"></div>
+        <div class="cal-detail-dot" style="background:${ev.color || getCatColor(ev.cat) || '#888'}"></div>
         <div class="cal-detail-title">${ev.title}${ev.note ? ' <span style="color:#aaa;font-size:11px;">— '+ev.note+'</span>' : ''}</div>
         <div class="cal-detail-range">${ev.start === ev.end ? ev.start : ev.start+'〜'+ev.end}${ev.timeStart ? ' ' + ev.timeStart + (ev.timeEnd ? '〜'+ev.timeEnd : '') : ''}</div>
         <button class="cal-detail-del" onclick="editCalEvent('${ev.id}')" style="color:#90CAF9;font-size:13px;">✏️</button>
@@ -2320,9 +2357,9 @@ function saveCalEvent() {
   const arr = loadCalEvents();
   if (calEditId) {
     const idx = arr.findIndex(e => e.id === calEditId);
-    if (idx !== -1) arr[idx] = { ...arr[idx], start, end: end || start, title, cat, color: CAT_COLOR[cat] || '#888', timeStart, timeEnd, note };
+    if (idx !== -1) arr[idx] = { ...arr[idx], start, end: end || start, title, cat, color: getCatColor(cat), timeStart, timeEnd, note };
   } else {
-    arr.push({ id: 'u' + Date.now(), start, end: end || start, title, cat, color: CAT_COLOR[cat] || '#888', timeStart, timeEnd, note });
+    arr.push({ id: 'u' + Date.now(), start, end: end || start, title, cat, color: getCatColor(cat), timeStart, timeEnd, note });
   }
   saveCalEvents(arr);
   closeCalModal();
@@ -2526,7 +2563,7 @@ function renderGantt() {
     if (si === undefined || ei === undefined) return '';
     const left  = si * CW;
     const width = (ei - si + 1) * CW;
-    const color = ev.color || CAT_COLOR[ev.cat] || '#888';
+    const color = ev.color || getCatColor(ev.cat) || '#888';
     const bar = `<div class="gantt-bar" style="left:${left}px;width:${width-2}px;background:${color};"
         title="${ev.title}（${ev.start}〜${ev.end}）" onclick="selectGanttEvent('${ev.id}')">${ev.title}</div>`;
     const btns = catKey !== undefined ? sortBtns(catKey, ev.title, idx, total) : '';
