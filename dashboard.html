@@ -68,7 +68,7 @@
 
     /* ── KPI row ── */
     .kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 20px; }
-    .kpi-card { background: #fff; border-radius: 10px; padding: 14px 16px; border: 1px solid #EBEBEB; overflow: hidden; }
+    .kpi-card { background: #fff; border-radius: 10px; padding: 14px 16px; border: 1px solid #EBEBEB; overflow: visible; }
     .kpi-label { font-size: 11px; color: #888; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .kpi-value { font-size: 20px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .kpi-period { font-size: 12px; color: #888; font-weight: 600; margin-bottom: 8px; }
@@ -87,6 +87,7 @@
     .tip::after { content:attr(data-tip); position:absolute; top:22px; right:var(--tip-right); left:var(--tip-left); background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:240px; white-space:pre-wrap; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
     .tip:hover::after { display:block; }
     .kpi-card { position:relative; }
+    .kpi-card:hover { z-index: 10; }
     .kpi-tip { position:absolute; top:8px; right:8px; display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:#EEEEEE; color:#aaa; font-size:9px; font-weight:700; cursor:help; }
     .kpi-tip::after { content:attr(data-tip); position:absolute; top:18px; right:var(--tip-right); left:var(--tip-left); background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:220px; white-space:pre-wrap; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
     .kpi-tip:hover::after { display:block; }
@@ -249,16 +250,16 @@
 
   <!-- メインアクションバー -->
   <div style="margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <!-- Meta広告CSV -->
-    <button class="entry-btn" onclick="document.getElementById('csv-input').click()" style="margin-top:0;background:#555;padding:10px 18px;font-size:13px;">
-      📣 Meta広告 CSV
-    </button>
-    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
     <!-- 楽天CSV -->
     <button class="entry-btn" onclick="document.getElementById('rakuten-csv-input').click()" style="margin-top:0;background:#BF0000;padding:10px 18px;font-size:13px;">
       🛒 楽天 CSV
     </button>
     <input type="file" id="rakuten-csv-input" accept=".csv" style="display:none" onchange="importRakutenCSV(this)">
+    <!-- Meta広告CSV -->
+    <button class="entry-btn" onclick="document.getElementById('csv-input').click()" style="margin-top:0;background:#555;padding:10px 18px;font-size:13px;">
+      📣 Meta広告 CSV
+    </button>
+    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
     <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
     <!-- IG・サーチ流入 -->
     <button class="entry-btn" onclick="openIgModal()" style="margin-top:0;background:#E64A19;padding:10px 18px;font-size:13px;">
@@ -1385,13 +1386,13 @@ document.addEventListener('mouseover', e => {
   const el = e.target.closest('.tip, .kpi-tip');
   if (!el) return;
   const rect = el.getBoundingClientRect();
-  // 右側に200px以上余裕がなければ右寄せ→左寄せ（after の right:0 → left:0）
-  if (rect.right < 260) {
-    el.style.setProperty('--tip-right', 'auto');
-    el.style.setProperty('--tip-left', '0');
-  } else {
+  // 画面右端に近い場合は左向き、それ以外は右向き（デフォルト）
+  if (rect.left + 250 > window.innerWidth) {
     el.style.setProperty('--tip-right', '0');
     el.style.setProperty('--tip-left', 'auto');
+  } else {
+    el.style.setProperty('--tip-right', 'auto');
+    el.style.setProperty('--tip-left', '0');
   }
 });
 
