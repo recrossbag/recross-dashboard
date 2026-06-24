@@ -888,8 +888,7 @@ function renderKPIs() {
     kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null),
   ].join('');
 
-  // ROAS・広告効果KPI
-  const tBudget = sum('budget');
+  // ROAS・広告効果KPI（tBudget・tClicksは上の広告KPI計算済みの変数を流用）
   const roas = (tSales > 0 && tBudget > 0) ? Math.round(tSales / tBudget * 100) : null;
   const igPerClick = (tClicks > 0 && tIg > 0) ? parseFloat((tIg / tClicks * 100).toFixed(1)) : null;
   const roasEl = document.getElementById('kpi-roas');
