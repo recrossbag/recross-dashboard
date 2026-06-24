@@ -83,12 +83,12 @@
     .chart-wrap h3 { display:flex; align-items:center; gap:6px; margin:0 0 14px; font-size:13px; font-weight:700; }
     /* ツールチップ */
     .tip { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:#E8E8E8; color:#888; font-size:10px; font-weight:700; cursor:help; position:relative; flex-shrink:0; margin-left:auto; }
-    .tip::after { content:attr(data-tip); position:absolute; top:22px; right:0; background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:260px; white-space:normal; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
+    .tip, .kpi-tip { --tip-right:0; --tip-left:auto; }
+    .tip::after { content:attr(data-tip); position:absolute; top:22px; right:var(--tip-right); left:var(--tip-left); background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:240px; white-space:pre-wrap; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
     .tip:hover::after { display:block; }
-    .tip-left::after { right:auto; left:0; }
     .kpi-card { position:relative; }
     .kpi-tip { position:absolute; top:8px; right:8px; display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:#EEEEEE; color:#aaa; font-size:9px; font-weight:700; cursor:help; }
-    .kpi-tip::after { content:attr(data-tip); position:absolute; top:18px; right:0; background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:240px; white-space:normal; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
+    .kpi-tip::after { content:attr(data-tip); position:absolute; top:18px; right:var(--tip-right); left:var(--tip-left); background:#333; color:#fff; padding:10px 14px; border-radius:8px; font-size:11px; line-height:1.7; font-weight:400; width:220px; white-space:pre-wrap; display:none; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,0.2); pointer-events:none; }
     .kpi-tip:hover::after { display:block; }
     .data-table-section { background:#fff; border-radius:12px; border:1px solid #EBEBEB; padding:20px; margin-bottom:16px; }
     .data-table-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
@@ -247,36 +247,35 @@
 
 <div class="container">
 
-  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
-    <!-- 手動入力グループ -->
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.05em;min-width:60px;">✏️ 手動入力</span>
-      <button class="entry-btn" onclick="openModal()" style="margin-top:0;">
-        データを入力する
-      </button>
-      <button class="entry-btn" onclick="openIgModal()" style="margin-top:0;background:#E64A19;">
-        📅 IG・サーチ流入をまとめ入力
-      </button>
-    </div>
-    <!-- CSVグループ -->
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.05em;min-width:60px;">📂 CSV取込</span>
-      <button class="entry-btn" onclick="document.getElementById('csv-input').click()" style="margin-top:0;background:#555;">
-        Meta広告
-      </button>
-      <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
-      <button class="entry-btn" onclick="document.getElementById('rakuten-csv-input').click()" style="margin-top:0;background:#BF0000;">
-        🛒 楽天店舗データ
-      </button>
-      <input type="file" id="rakuten-csv-input" accept=".csv" style="display:none" onchange="importRakutenCSV(this)">
-      <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
-    </div>
-    <!-- レポートグループ -->
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.05em;min-width:60px;">📄 出力</span>
-      <button class="entry-btn" onclick="openReport()" style="margin-top:0;background:#37474F;">
-        レポートを印刷
-      </button>
+  <!-- メインアクションバー -->
+  <div style="margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <!-- Meta広告CSV -->
+    <button class="entry-btn" onclick="document.getElementById('csv-input').click()" style="margin-top:0;background:#555;padding:10px 18px;font-size:13px;">
+      📣 Meta広告 CSV
+    </button>
+    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
+    <!-- 楽天CSV -->
+    <button class="entry-btn" onclick="document.getElementById('rakuten-csv-input').click()" style="margin-top:0;background:#BF0000;padding:10px 18px;font-size:13px;">
+      🛒 楽天 CSV
+    </button>
+    <input type="file" id="rakuten-csv-input" accept=".csv" style="display:none" onchange="importRakutenCSV(this)">
+    <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
+    <!-- IG・サーチ流入 -->
+    <button class="entry-btn" onclick="openIgModal()" style="margin-top:0;background:#E64A19;padding:10px 18px;font-size:13px;">
+      📸 IG・サーチ流入入力
+    </button>
+    <!-- 区切り -->
+    <div style="flex:1;"></div>
+    <!-- 印刷 -->
+    <button onclick="openReport()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 16px;font-size:13px;color:#555;cursor:pointer;white-space:nowrap;">
+      🖨️ レポート印刷
+    </button>
+    <!-- その他（手動入力） -->
+    <div style="position:relative;">
+      <button id="more-btn" onclick="toggleMoreMenu()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 12px;font-size:13px;color:#555;cursor:pointer;">⋯</button>
+      <div id="more-menu" style="display:none;position:absolute;top:42px;right:0;background:#fff;border:1px solid #E0E0E0;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:100;min-width:160px;padding:6px 0;">
+        <button onclick="openModal();toggleMoreMenu()" style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:#333;">✏️ データを手入力する</button>
+      </div>
     </div>
   </div>
 
@@ -1381,6 +1380,32 @@ function clearForm() {
 // ─────────────────────────────────────────────
 // タブ
 // ─────────────────────────────────────────────
+// ツールチップが画面左端で見切れないよう方向を自動調整
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('.tip, .kpi-tip');
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  // 右側に200px以上余裕がなければ右寄せ→左寄せ（after の right:0 → left:0）
+  if (rect.right < 260) {
+    el.style.setProperty('--tip-right', 'auto');
+    el.style.setProperty('--tip-left', '0');
+  } else {
+    el.style.setProperty('--tip-right', '0');
+    el.style.setProperty('--tip-left', 'auto');
+  }
+});
+
+function toggleMoreMenu() {
+  const m = document.getElementById('more-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('more-btn')?.contains(e.target)) {
+    const m = document.getElementById('more-menu');
+    if (m) m.style.display = 'none';
+  }
+});
+
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
