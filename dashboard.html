@@ -1787,15 +1787,20 @@ function parseMetaCSV(text) {
   // ヘッダー行からカラムインデックスを取得
   const header = rows[0].map(h => h.replace(/"/g,'').trim());
   function findCol(...candidates) {
+    // 完全一致優先、次に部分一致
+    for (const c of candidates) {
+      const idx = header.findIndex(h => h === c);
+      if (idx !== -1) return idx;
+    }
     for (const c of candidates) {
       const idx = header.findIndex(h => h.includes(c));
       if (idx !== -1) return idx;
     }
     return -1;
   }
-  const colDate   = findCol('レポート開始', 'Date');
+  const colDate   = findCol('レポート開始日', 'レポート開始', 'Date');
   const colImp    = findCol('インプレッション');
-  const colClicks = findCol('リンククリック数');
+  const colClicks = findCol('リンククリック数', 'リンククリック');
   const colBudget = findCol('消化金額');
   const colReach  = findCol('リーチ');
   const colFreq   = findCol('フリークエンシー');
