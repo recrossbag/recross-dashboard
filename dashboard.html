@@ -80,6 +80,16 @@
 
     /* ── Chart ── */
     .chart-wrap { background: #fff; border-radius: 12px; border: 1px solid #EBEBEB; padding: 20px; margin-bottom: 16px; }
+    .data-table-section { background:#fff; border-radius:12px; border:1px solid #EBEBEB; padding:20px; margin-bottom:16px; }
+    .data-table-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .data-table-wrap { overflow-x:auto; }
+    .data-table-wrap table { width:100%; border-collapse:collapse; font-size:12px; }
+    .data-table-wrap th { background:#F5F5F5; padding:8px 10px; text-align:right; font-weight:600; color:#555; white-space:nowrap; border-bottom:2px solid #E0E0E0; }
+    .data-table-wrap th:first-child { text-align:left; }
+    .data-table-wrap td { padding:7px 10px; text-align:right; border-bottom:1px solid #F0F0F0; color:#333; white-space:nowrap; }
+    .data-table-wrap td:first-child { text-align:left; color:#555; font-weight:500; }
+    .data-table-wrap tr:last-child td { border-bottom:none; font-weight:700; background:#FAFAFA; }
+    .data-table-wrap tr:hover td { background:#F9F9F9; }
     .chart-wrap h3 { font-size: 13px; font-weight: 700; margin-bottom: 16px; }
 
     /* ── History ── */
@@ -350,6 +360,13 @@
       <h3>クリック数・インプレッション</h3>
       <canvas id="chart-clicks" height="80"></canvas>
     </div>
+    <div class="data-table-section" id="ad-table-section">
+      <div class="data-table-header">
+        <h3 style="margin:0">📋 データ一覧</h3>
+        <button class="entry-btn" onclick="exportCSV('ad')" style="margin:0;padding:6px 14px;font-size:12px;">⬇ CSVエクスポート</button>
+      </div>
+      <div class="data-table-wrap" id="ad-table-wrap"></div>
+    </div>
   </div>
 
   <!-- 売上タブ -->
@@ -367,6 +384,13 @@
     <div class="chart-wrap">
       <h3>アクセス内訳（楽天外 / 楽天内 / Instagram）</h3>
       <canvas id="chart-access-breakdown" height="80"></canvas>
+    </div>
+    <div class="data-table-section" id="sales-table-section">
+      <div class="data-table-header">
+        <h3 style="margin:0">📋 データ一覧</h3>
+        <button class="entry-btn" onclick="exportCSV('sales')" style="margin:0;padding:6px 14px;font-size:12px;">⬇ CSVエクスポート</button>
+      </div>
+      <div class="data-table-wrap" id="sales-table-wrap"></div>
     </div>
   </div>
 
@@ -995,6 +1019,151 @@ function renderCharts() {
     { label:'🏪 楽天内アクセス', data: d.map(e=>e.intVisitors||null), backgroundColor:'rgba(38,166,154,0.7)', stack:'s' },
     { label:'📸 Instagram流入', data: d.map(e=>e.igVisitors||null), backgroundColor:'rgba(233,30,99,0.7)', stack:'s' },
   ], { scales: { x: { stacked:true }, y: { stacked:true } } });
+
+  renderDataTables();
+}
+
+// ─────────────────────────────────────────────
+// データ一覧テーブル（売上・広告）
+// ─────────────────────────────────────────────
+function fmt(v, type) {
+  if (v == null || v === '') return '—';
+  const n = Number(v);
+  if (isNaN(n)) return '—';
+  if (type === 'yen')  return '¥' + n.toLocaleString();
+  if (type === 'pct')  return n.toFixed(2) + '%';
+  if (type === 'dec1') return n.toFixed(1);
+  if (type === 'dec2') return n.toFixed(2);
+  return n.toLocaleString();
+}
+
+function renderDataTables() {
+  const d = last10();
+  const label = chartPeriod === 'month'
+    ? r => r.date.slice(0, 7)
+    : r => r.date.slice(5);
+
+  // ── 広告テーブル ──
+  const adCols = [
+    { key:'date',   head:'日付',              fmt: r => label(r),              sum: false },
+    { key:'ctr',    head:'CTR(%)',             fmt: r => fmt(r.ctr,'dec2'),     sum:'avg' },
+    { key:'cpc',    head:'CPC(¥)',             fmt: r => fmt(r.cpc,'yen'),      sum:'avg' },
+    { key:'clicks', head:'クリック数',         fmt: r => fmt(r.clicks,''),      sum:'sum' },
+    { key:'adImp',  head:'インプレッション',   fmt: r => fmt(r.adImp,''),       sum:'sum' },
+    { key:'budget', head:'消化予算(¥)',        fmt: r => fmt(r.budget,'yen'),   sum:'sum' },
+    { key:'freq',   head:'フリークエンシー',   fmt: r => fmt(r.freq,'dec2'),    sum:'avg' },
+  ];
+  buildTable('ad-table-wrap', d, adCols);
+
+  // ── 売上テーブル ──
+  const salesCols = [
+    { key:'date',          head:'日付',           fmt: r => label(r),               sum: false },
+    { key:'sales',         head:'売上金額(¥)',     fmt: r => fmt(r.sales,'yen'),      sum:'sum' },
+    { key:'orders',        head:'売上件数',        fmt: r => fmt(r.orders,''),        sum:'sum' },
+    { key:'visitors',      head:'アクセス人数',    fmt: r => fmt(r.visitors,''),      sum:'sum' },
+    { key:'cvr',           head:'CVR(%)',          fmt: r => {
+        const vis = Number(r.visitors)||0, ord = Number(r.orders)||0;
+        return (vis>0&&ord>0) ? (ord/vis*100).toFixed(2)+'%' : '—';
+      }, sum: false },
+    { key:'aov',           head:'客単価(¥)',       fmt: r => {
+        const s = Number(r.sales)||0, ord = Number(r.orders)||0;
+        return ord>0 ? '¥'+Math.round(s/ord).toLocaleString() : '—';
+      }, sum: false },
+    { key:'igVisitors',    head:'IG流入',          fmt: r => fmt(r.igVisitors,''),    sum:'sum' },
+    { key:'extVisitors',   head:'楽天外',          fmt: r => fmt(r.extVisitors,''),   sum:'sum' },
+    { key:'intVisitors',   head:'楽天内',          fmt: r => fmt(r.intVisitors,''),   sum:'sum' },
+    { key:'searchVisitors',head:'サーチ流入',      fmt: r => fmt(r.searchVisitors,''),sum:'sum' },
+  ];
+  buildTable('sales-table-wrap', d, salesCols);
+}
+
+function buildTable(wrapperId, rows, cols) {
+  const wrap = document.getElementById(wrapperId);
+  if (!wrap) return;
+  if (!rows.length) { wrap.innerHTML = '<p style="color:#999;font-size:12px">データがありません</p>'; return; }
+
+  // 合計行
+  const totals = {};
+  cols.forEach(c => {
+    if (c.sum === 'sum') {
+      totals[c.key] = rows.reduce((s, r) => s + (Number(r[c.key])||0), 0);
+    } else if (c.sum === 'avg') {
+      const vals = rows.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v)));
+      totals[c.key] = vals.length ? vals.reduce((s,v)=>s+Number(v),0)/vals.length : null;
+    }
+  });
+
+  const th = cols.map(c => `<th>${c.head}</th>`).join('');
+  const trs = rows.map(r => {
+    const tds = cols.map(c => `<td>${c.fmt(r)}</td>`).join('');
+    return `<tr>${tds}</tr>`;
+  }).join('');
+
+  // 合計行描画
+  const sumTds = cols.map(c => {
+    if (!c.sum) return `<td>${c.key==='date' ? '合計 / 平均' : ''}</td>`;
+    const v = totals[c.key];
+    if (v == null) return '<td>—</td>';
+    if (c.sum==='sum') {
+      if (c.head.includes('¥')) return `<td>¥${Math.round(v).toLocaleString()}</td>`;
+      return `<td>${Math.round(v).toLocaleString()}</td>`;
+    }
+    if (c.sum==='avg') {
+      if (c.head.includes('¥')) return `<td>¥${Math.round(v).toLocaleString()}</td>`;
+      return `<td>${v.toFixed(2)}</td>`;
+    }
+    return '<td>—</td>';
+  }).join('');
+
+  wrap.innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${trs}<tr>${sumTds}</tr></tbody></table>`;
+}
+
+function exportCSV(type) {
+  const d = last10();
+  const label = chartPeriod === 'month'
+    ? r => r.date.slice(0, 7)
+    : r => r.date;
+  let headers, rows;
+
+  if (type === 'ad') {
+    headers = ['日付','CTR(%)','CPC(¥)','クリック数','インプレッション','消化予算(¥)','フリークエンシー'];
+    rows = d.map(r => [
+      label(r),
+      r.ctr ?? '',
+      r.cpc ?? '',
+      r.clicks ?? '',
+      r.adImp ?? '',
+      r.budget ?? '',
+      r.freq ?? '',
+    ]);
+  } else {
+    headers = ['日付','売上金額(¥)','売上件数','アクセス人数','CVR(%)','客単価(¥)','IG流入','楽天外','楽天内','サーチ流入'];
+    rows = d.map(r => {
+      const vis = Number(r.visitors)||0, ord = Number(r.orders)||0, sal = Number(r.sales)||0;
+      return [
+        label(r),
+        r.sales ?? '',
+        r.orders ?? '',
+        r.visitors ?? '',
+        (vis>0&&ord>0) ? (ord/vis*100).toFixed(2) : '',
+        ord>0 ? Math.round(sal/ord) : '',
+        r.igVisitors ?? '',
+        r.extVisitors ?? '',
+        r.intVisitors ?? '',
+        r.searchVisitors ?? '',
+      ];
+    });
+  }
+
+  const bom = '﻿';
+  const csv = bom + [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${type === 'ad' ? '広告データ' : '売上データ'}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─────────────────────────────────────────────
