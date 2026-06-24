@@ -259,6 +259,7 @@
         🛒 楽天店舗データ
       </button>
       <input type="file" id="rakuten-csv-input" accept=".csv" style="display:none" onchange="importRakutenCSV(this)">
+      <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
     </div>
     <!-- レポートグループ -->
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -709,7 +710,8 @@ DATA_DOC.onSnapshot(doc => {
   entries        = data.entries        || [];
   events         = data.events         || [];
   calEventsCache = data.calEvents      || [];
-  customCatColors = data.catColors    || {};
+  customCatColors = data.catColors   || {};
+  titleColors     = data.titleColors || {};
   applyCatColorToLegend();
   // 自動修復：日付フォーマット重複・空行を一度だけ整理（修復不要なら何もしない＝ループしない）
   if (needsEntryRepair(entries)) {
@@ -2082,15 +2084,36 @@ function applyCatColorToLegend() {
 // ガントチャート：カテゴリ内のタイトルごとに色を割り当てる
 const GANTT_PALETTES = {
   rakuten: ['#BF0000','#C62828','#D32F2F','#B71C1C','#7B0000'],
-  coupon:  ['#2E7D32','#00695C','#1565C0','#4527A0','#00838F','#2E7D32'],
-  point:   ['#6A1B9A','#AD1457','#4527A0','#283593','#00695C','#1A237E'],
+  coupon:  ['#2E7D32','#00695C','#1565C0','#4527A0','#00838F'],
+  point:   ['#6A1B9A','#AD1457','#4527A0','#283593','#00695C'],
   ad:      ['#E65100','#BF360C','#F57F17','#33691E','#006064','#37474F','#880E4F'],
 };
 const DEFAULT_GANTT_PALETTE = ['#455A64','#37474F','#546E7A','#607D8B','#78909C'];
 
-function getGanttTitleColor(cat, titleIndex) {
+let titleColors = {}; // { 'ad:広告A': '#E65100', ... } Firestoreに保存
+let _cpTarget = null; // カラーピッカーの対象
+
+function getGanttTitleColor(cat, titleIndex, title) {
+  const key = cat + ':' + title;
+  if (titleColors[key]) return titleColors[key];
   const palette = GANTT_PALETTES[cat] || DEFAULT_GANTT_PALETTE;
   return palette[titleIndex % palette.length];
+}
+function saveTitleColors() {
+  DATA_DOC.set({ titleColors }, { merge: true });
+}
+function openTitleColorPicker(cat, title) {
+  _cpTarget = { cat, title };
+  const key = cat + ':' + title;
+  const inp = document.getElementById('gantt-title-color-inp');
+  inp.value = titleColors[key] || getGanttTitleColor(cat, 0, title);
+  inp.click();
+}
+function applyTitleColor(color) {
+  if (!_cpTarget) return;
+  titleColors[_cpTarget.cat + ':' + _cpTarget.title] = color;
+  saveTitleColors();
+  renderGantt();
 }
 
 function updateCatColor(cat, color) {
@@ -2578,13 +2601,16 @@ function renderGantt() {
     if (si === undefined || ei === undefined) return '';
     const left  = si * CW;
     const width = (ei - si + 1) * CW;
-    const color = catKey !== undefined ? getGanttTitleColor(catKey, idx) : (getCatColor(ev.cat) || '#888');
+    const color = catKey !== undefined ? getGanttTitleColor(catKey, idx, ev.title) : (getCatColor(ev.cat) || '#888');
     const bar = `<div class="gantt-bar" style="left:${left}px;width:${width-2}px;background:${color};"
         title="${ev.title}（${ev.start}〜${ev.end}）" onclick="selectGanttEvent('${ev.id}')">${ev.title}</div>`;
     const btns = catKey !== undefined ? sortBtns(catKey, ev.title, idx, total) : '';
+    const dotClick = catKey !== undefined
+      ? `onclick="event.stopPropagation();openTitleColorPicker('${catKey}','${ev.title.replace(/'/g,'\\\'')}')" title="クリックで色変更" style="background:${color};cursor:pointer;"`
+      : `style="background:${color};"`;
     return `<div class="gantt-row">
         <div class="gantt-label-col${indent ? ' indent' : ''}" onclick="selectGanttEvent('${ev.id}')" style="cursor:pointer;">
-          <div class="gantt-label-dot" style="background:${color};"></div>
+          <div class="gantt-label-dot" ${dotClick}></div>
           <div class="gantt-label-txt">${ev.title}</div>
           ${btns}
         </div>
@@ -2594,7 +2620,7 @@ function renderGantt() {
 
   // 同タイトル複数イベント＝1行に複数バー
   function titleRow(title, evArr, indent, catKey, idx, total) {
-    const color = catKey !== undefined ? getGanttTitleColor(catKey, idx) : (getCatColor(evArr[0]?.cat) || '#888');
+    const color = catKey !== undefined ? getGanttTitleColor(catKey, idx, title) : (getCatColor(evArr[0]?.cat) || '#888');
     let bars = '';
     evArr.forEach(ev => {
       const s = ev.start < rangeStart ? rangeStart : ev.start;
@@ -2607,9 +2633,12 @@ function renderGantt() {
           title="${ev.title}（${ev.start}〜${ev.end}）" onclick="selectGanttEvent('${ev.id}')">${ev.title}</div>`;
     });
     const btns = catKey !== undefined ? sortBtns(catKey, title, idx, total) : '';
+    const dotClick2 = catKey !== undefined
+      ? `onclick="openTitleColorPicker('${catKey}','${title.replace(/'/g,'\\\'')}')" title="クリックで色変更" style="background:${color};cursor:pointer;"`
+      : `style="background:${color};"`;
     return `<div class="gantt-row">
         <div class="gantt-label-col${indent ? ' indent' : ''}" style="cursor:default;">
-          <div class="gantt-label-dot" style="background:${color};"></div>
+          <div class="gantt-label-dot" ${dotClick2}></div>
           <div class="gantt-label-txt">${title}</div>
           ${btns}
         </div>
