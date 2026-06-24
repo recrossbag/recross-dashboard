@@ -2079,6 +2079,20 @@ function applyCatColorToLegend() {
     if (inp) inp.value = getCatColor(cat);
   });
 }
+// ガントチャート：カテゴリ内のタイトルごとに色を割り当てる
+const GANTT_PALETTES = {
+  rakuten: ['#BF0000','#C62828','#D32F2F','#B71C1C','#7B0000'],
+  coupon:  ['#2E7D32','#00695C','#1565C0','#4527A0','#00838F','#2E7D32'],
+  point:   ['#6A1B9A','#AD1457','#4527A0','#283593','#00695C','#1A237E'],
+  ad:      ['#E65100','#BF360C','#F57F17','#33691E','#006064','#37474F','#880E4F'],
+};
+const DEFAULT_GANTT_PALETTE = ['#455A64','#37474F','#546E7A','#607D8B','#78909C'];
+
+function getGanttTitleColor(cat, titleIndex) {
+  const palette = GANTT_PALETTES[cat] || DEFAULT_GANTT_PALETTE;
+  return palette[titleIndex % palette.length];
+}
+
 function updateCatColor(cat, color) {
   customCatColors[cat] = color;
   saveCustomCatColors();
@@ -2116,6 +2130,7 @@ function setCalView(view) {
   document.getElementById('view-btn-gantt').classList.toggle('active', view === 'gantt');
   document.getElementById('calendar-view').style.display = view === 'calendar' ? 'block' : 'none';
   document.getElementById('gantt-view').style.display    = view === 'gantt'    ? 'block' : 'none';
+  document.getElementById('cal-legend').style.display    = view === 'calendar' ? 'flex'  : 'none';
   renderCalendar();
 }
 
@@ -2237,7 +2252,7 @@ function renderCalendar() {
 
         const bar = document.createElement('div');
         bar.className = 'cal-event-bar' + (isStart ? ' bar-start' : '') + (isEnd ? ' bar-end' : '');
-        bar.style.cssText = `grid-column:${colStart+1}/${colEnd+2};grid-row:${lane+1};background:${ev.color||getCatColor(ev.cat)||'#888'};`;
+        bar.style.cssText = `grid-column:${colStart+1}/${colEnd+2};grid-row:${lane+1};background:${getCatColor(ev.cat)||'#888'};`;
         bar.textContent = isStart ? ev.title : '';
         bar.title = ev.title;
         bar.onclick = (e) => { e.stopPropagation(); selectCalDay(ev.start <= weekStart ? weekStart : ev.start); };
@@ -2293,7 +2308,7 @@ function renderCalDetail(dateStr) {
   } else {
     container.innerHTML = evs.map(ev => `
       <div class="cal-detail-event">
-        <div class="cal-detail-dot" style="background:${ev.color || getCatColor(ev.cat) || '#888'}"></div>
+        <div class="cal-detail-dot" style="background:${getCatColor(ev.cat) || '#888'}"></div>
         <div class="cal-detail-title">${ev.title}${ev.note ? ' <span style="color:#aaa;font-size:11px;">— '+ev.note+'</span>' : ''}</div>
         <div class="cal-detail-range">${ev.start === ev.end ? ev.start : ev.start+'〜'+ev.end}${ev.timeStart ? ' ' + ev.timeStart + (ev.timeEnd ? '〜'+ev.timeEnd : '') : ''}</div>
         <button class="cal-detail-del" onclick="editCalEvent('${ev.id}')" style="color:#90CAF9;font-size:13px;">✏️</button>
@@ -2563,7 +2578,7 @@ function renderGantt() {
     if (si === undefined || ei === undefined) return '';
     const left  = si * CW;
     const width = (ei - si + 1) * CW;
-    const color = ev.color || getCatColor(ev.cat) || '#888';
+    const color = catKey !== undefined ? getGanttTitleColor(catKey, idx) : (getCatColor(ev.cat) || '#888');
     const bar = `<div class="gantt-bar" style="left:${left}px;width:${width-2}px;background:${color};"
         title="${ev.title}（${ev.start}〜${ev.end}）" onclick="selectGanttEvent('${ev.id}')">${ev.title}</div>`;
     const btns = catKey !== undefined ? sortBtns(catKey, ev.title, idx, total) : '';
@@ -2579,7 +2594,7 @@ function renderGantt() {
 
   // 同タイトル複数イベント＝1行に複数バー
   function titleRow(title, evArr, indent, catKey, idx, total) {
-    const color = evArr[0].color || CAT_COLOR[evArr[0].cat] || '#888';
+    const color = catKey !== undefined ? getGanttTitleColor(catKey, idx) : (getCatColor(evArr[0]?.cat) || '#888');
     let bars = '';
     evArr.forEach(ev => {
       const s = ev.start < rangeStart ? rangeStart : ev.start;
