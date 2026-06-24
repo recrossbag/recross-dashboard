@@ -286,13 +286,8 @@
         <tbody>
           <tr style="border-bottom:1px solid #F5F5F5;">
             <td style="padding:8px 6px;font-weight:600;">📣 広告（CTR・CPC等）</td>
-            <td style="padding:8px 6px;">Meta広告マネージャ</td>
-            <td style="padding:8px 6px;color:#555;">「広告」タブ →「内訳」→「時間」→「日」→ ダウンロード（↓）<br><span style="color:#7986CB;font-weight:600;">→ そのままCSV取り込みボタンでOK</span></td>
-          </tr>
-          <tr style="border-bottom:1px solid #F5F5F5;">
-            <td style="padding:8px 6px;font-weight:600;">👥 フォロワー増減</td>
-            <td style="padding:8px 6px;">Meta Business Suite</td>
-            <td style="padding:8px 6px;color:#555;">「インサイト」→「オーディエンス」→ フォロワー数の増減を手入力</td>
+            <td style="padding:8px 6px;">Meta広告マネージャ<br><a href="https://adsmanager.facebook.com/" target="_blank" style="font-size:11px;color:#7986CB;">→ 広告マネージャを開く</a></td>
+            <td style="padding:8px 6px;color:#555;">「キャンペーン」→「内訳」→「日」→「エクスポート」<br><span style="color:#7986CB;font-weight:600;">→ そのままCSV取り込みボタンでOK</span></td>
           </tr>
           <tr style="border-bottom:1px solid #F5F5F5;">
             <td style="padding:8px 6px;font-weight:600;">🛒 売上・楽天流入</td>
@@ -302,7 +297,7 @@
         </tbody>
       </table>
       <div style="margin-top:10px;padding:10px 12px;background:#F0F4FF;border-radius:8px;font-size:12px;color:#555;line-height:1.7;">
-        ⏰ <strong>入力タイミング：2〜3日に1回</strong>でOK。広告はCSV、売上・アクセスは手入力が基本。
+        ⏰ <strong>入力タイミング：週1〜2回</strong>でOK。広告・売上はCSV取込。アクセス内訳（楽天外・楽天内・サーチ・IG流入）は手入力。
       </div>
     </div>
   </details>
@@ -757,11 +752,14 @@ function init() {
 function renderEvents() {
   const list = document.getElementById('event-list');
   const today = new Date(); today.setHours(0,0,0,0);
-  const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
+  // 今日以降のみ表示
+  const sorted = [...events]
+    .filter(ev => { const d = new Date(ev.date); d.setHours(0,0,0,0); return d >= today; })
+    .sort((a,b) => a.date.localeCompare(b.date));
 
   list.innerHTML = '';
   if (sorted.length === 0) {
-    list.innerHTML = '<div class="empty">予定はありません</div>';
+    list.innerHTML = '<div class="empty">今後の予定はありません</div>';
     return;
   }
   sorted.forEach(ev => {
@@ -769,8 +767,7 @@ function renderEvents() {
     const diff = Math.floor((evDate - today) / 86400000);
     let badge = '';
     if (diff === 0) badge = '<span class="badge today">本日</span>';
-    else if (diff > 0 && diff <= 3) badge = `<span class="badge soon">あと${diff}日</span>`;
-    else if (diff < 0) badge = `<span class="badge">${Math.abs(diff)}日前</span>`;
+    else if (diff <= 3) badge = `<span class="badge soon">あと${diff}日</span>`;
 
     const div = document.createElement('div');
     div.className = 'event-item';
