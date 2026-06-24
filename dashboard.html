@@ -379,6 +379,21 @@
       <h3>アクセス内訳（楽天外 / 楽天内 / Instagram）</h3>
       <canvas id="chart-access-breakdown" height="80"></canvas>
     </div>
+    <!-- 広告との相関 -->
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;color:#888;text-transform:uppercase;margin:24px 0 10px;">📣 広告との相関</div>
+    <div class="kpi-row" id="kpi-roas"></div>
+    <div class="chart-wrap">
+      <h3>売上 vs 広告クリック数（2軸）</h3>
+      <canvas id="chart-sales-vs-clicks" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>ROAS推移（売上 ÷ 広告費）</h3>
+      <canvas id="chart-roas" height="80"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>IG流入 vs 売上（散布図）</h3>
+      <canvas id="chart-scatter" height="80"></canvas>
+    </div>
     <div class="data-table-section" id="sales-table-section">
       <div class="data-table-header">
         <h3 style="margin:0">📋 データ一覧</h3>
@@ -872,6 +887,18 @@ function renderKPIs() {
     kpiCard('客単価', aov, 0, '¥', '売上÷売上件数', null),
     kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null),
   ].join('');
+
+  // ROAS・広告効果KPI
+  const tBudget = sum('budget');
+  const roas = (tSales > 0 && tBudget > 0) ? Math.round(tSales / tBudget * 100) : null;
+  const igPerClick = (tClicks > 0 && tIg > 0) ? parseFloat((tIg / tClicks * 100).toFixed(1)) : null;
+  const roasEl = document.getElementById('kpi-roas');
+  if (roasEl) roasEl.innerHTML = [
+    kpiCard('ROAS', roas, 0, '%', '売上÷広告費（目標1000%↑）', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad'),
+    kpiCard('広告費（合計）', tBudget, 0, '¥', '', null),
+    kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷広告クリック', null),
+    kpiCard('クリック単価（CPC）', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad'),
+  ].join('');
 }
 
 function kpiCard(label, value, decimals, unit, target, colorFn, wow) {
@@ -1031,6 +1058,47 @@ function renderCharts() {
     { label:'🏪 楽天内（サーチ以外）', data: d.map(e=>Math.max(0,(e.intVisitors||0)-(e.searchVisitors||0))||null), backgroundColor:'rgba(38,166,154,0.5)',  stack:'int' },
     { label:'🔍 サーチ流入（楽天内の一部）', data: d.map(e=>e.searchVisitors||null),                           backgroundColor:'rgba(121,134,203,0.85)', stack:'int' },
   ], { scales: { x: { stacked:true }, y: { stacked:true } } });
+
+  // ── 広告×売上 相関チャート ──
+  const roasData = d.map(e => {
+    const s = Number(e.sales)||0, b = Number(e.budget)||0;
+    return (s > 0 && b > 0) ? Math.round(s / b * 100) : null;
+  });
+  makeChart('chart-sales-vs-clicks', 'bar', [
+    { label:'売上(¥)', data: d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.6)', yAxisID:'y' },
+    { label:'広告クリック', type:'line', data: d.map(e=>e.clicks||null), borderColor:'#7986CB', backgroundColor:'rgba(121,134,203,0.08)', tension:0.3, yAxisID:'y1', pointRadius:3, fill:true },
+  ], { scales: { ...CHART_DEFAULTS.scales,
+    y:  { grid:{color:'#F0F0F0'}, ticks:{font:{size:11}, callback:v=>'¥'+v.toLocaleString()} },
+    y1: { position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:11}}, title:{display:true,text:'クリック数',font:{size:10}} }
+  }});
+
+  makeChart('chart-roas', 'line', [
+    { label:'ROAS(%)', data: roasData, borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true, pointRadius:4 },
+    targetLine('目標1000%', 1000, '#FFB74D'),
+  ]);
+
+  // 散布図：IG流入 vs 売上
+  const scatterData = d
+    .filter(e => (e.igVisitors||0) > 0 || (e.sales||0) > 0)
+    .map(e => ({ x: Number(e.igVisitors)||0, y: Number(e.sales)||0, label: e.date?.slice(5) }));
+  if (charts['chart-scatter']) charts['chart-scatter'].destroy();
+  const scatterCtx = document.getElementById('chart-scatter')?.getContext('2d');
+  if (scatterCtx) {
+    charts['chart-scatter'] = new Chart(scatterCtx, {
+      type: 'scatter',
+      data: { datasets: [{ label:'IG流入 vs 売上', data: scatterData,
+        backgroundColor:'rgba(233,30,99,0.6)', pointRadius:6, pointHoverRadius:8 }] },
+      options: { ...CHART_DEFAULTS,
+        scales: {
+          x: { title:{display:true,text:'IG流入（人）',font:{size:11}}, grid:{color:'#F0F0F0'}, ticks:{font:{size:11}} },
+          y: { title:{display:true,text:'売上（¥）',font:{size:11}}, grid:{color:'#F0F0F0'}, ticks:{font:{size:11},callback:v=>'¥'+v.toLocaleString()} }
+        },
+        plugins: { ...CHART_DEFAULTS.plugins,
+          tooltip: { callbacks: { label: ctx => `${ctx.raw.label} IG:${ctx.raw.x}人 売上:¥${ctx.raw.y.toLocaleString()}` } }
+        }
+      }
+    });
+  }
 
   renderDataTables();
 }
