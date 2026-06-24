@@ -1208,29 +1208,47 @@ function importRakutenCSV(input) {
 function parseRakutenCSV(text) {
   const result = [];
   const lines = text.replace(/\r\n/g,'\n').split('\n');
-  for (const line of lines) {
-    if (!line.startsWith('"2026') && !line.startsWith('2026')) continue;
-    // CSV行をパース
-    const fields = [];
-    let cur = '', inQ = false;
+  if (lines.length < 2) return result;
+
+  // 区切り文字を自動判定（タブ or カンマ）
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+
+  // ヘッダー行からカラムインデックスを取得
+  function splitLine(line) {
+    if (sep === '\t') return line.split('\t').map(f => f.replace(/^"|"$/g,'').trim());
+    const fields = []; let cur = '', inQ = false;
     for (let i = 0; i < line.length; i++) {
       const ch = line[i];
       if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
+      else if (ch === sep && !inQ) { fields.push(cur.trim()); cur = ''; }
       else { cur += ch; }
     }
-    fields.push(cur);
-    const device = fields[2];
-    if (device !== 'すべて') continue;
-    // データが無い日（未来日・未集計日など）はスキップ：売上もアクセスも空欄なら取り込まない
-    const salesRaw  = (fields[3] ?? '').trim();
-    const accessRaw = (fields[5] ?? '').trim();
+    fields.push(cur.trim());
+    return fields;
+  }
+
+  const header = splitLine(lines[0]);
+  const colDate    = header.findIndex(h => h.includes('日付'));
+  const colDevice  = header.findIndex(h => h.includes('デバイス'));
+  const colSales   = header.findIndex(h => h === '売上金額');
+  const colOrders  = header.findIndex(h => h === '売上件数');
+  const colVisitors= header.findIndex(h => h === 'アクセス人数');
+
+  for (const line of lines.slice(1)) {
+    if (!line.trim()) continue;
+    const fields = splitLine(line);
+    const dateStr = (fields[colDate] ?? '').replace(/\//g,'-').replace(/"/g,'');
+    if (!/^\d{4}-\d{1,2}-\d{1,2}/.test(dateStr)) continue;
+    const device = colDevice >= 0 ? (fields[colDevice] ?? '') : '';
+    if (colDevice >= 0 && device !== 'すべて') continue;
+    const salesRaw  = (fields[colSales]   ?? '').replace(/,/g,'');
+    const accessRaw = (fields[colVisitors]?? '').replace(/,/g,'');
     if (salesRaw === '' && accessRaw === '') continue;
-    const dateRaw = fields[0].replace(/\//g, '-').replace(/"/g,'');
+    const dateNorm = dateStr.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_,y,m,d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
     const sales    = Number(salesRaw)  || 0;
     const visitors = Number(accessRaw) || 0;
-    const orders   = Number((fields[4] ?? '').trim()) || 0;  // 売上件数（CVR・客単価の計算に使用）
-    result.push({ date: dateRaw, sales, visitors, orders });
+    const orders   = Number((fields[colOrders] ?? '').replace(/,/g,'')) || 0;
+    result.push({ date: dateNorm, sales, visitors, orders });
   }
   return result;
 }
