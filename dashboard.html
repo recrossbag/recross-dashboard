@@ -83,12 +83,10 @@
     .data-table-section { background:#fff; border-radius:12px; border:1px solid #EBEBEB; padding:20px; margin-bottom:16px; }
     .data-table-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
     .data-table-wrap { overflow-x:auto; }
-    .data-table-wrap table { width:100%; border-collapse:collapse; font-size:12px; }
-    .data-table-wrap th { background:#F5F5F5; padding:8px 10px; text-align:right; font-weight:600; color:#555; white-space:nowrap; border-bottom:2px solid #E0E0E0; }
-    .data-table-wrap th:first-child { text-align:left; }
-    .data-table-wrap td { padding:7px 10px; text-align:right; border-bottom:1px solid #F0F0F0; color:#333; white-space:nowrap; }
-    .data-table-wrap td:first-child { text-align:left; color:#555; font-weight:500; }
-    .data-table-wrap tr:last-child td { border-bottom:none; font-weight:700; background:#FAFAFA; }
+    .data-table-wrap table { border-collapse:collapse; font-size:11px; }
+    .data-table-wrap th { background:#F5F5F5; padding:6px 10px; text-align:center; font-weight:600; color:#555; white-space:nowrap; border:1px solid #E8E8E8; }
+    .data-table-wrap tbody th { text-align:left; min-width:110px; position:sticky; left:0; z-index:1; background:#F5F5F5; border-right:2px solid #DDD; }
+    .data-table-wrap td { padding:6px 10px; text-align:right; border:1px solid #F0F0F0; color:#333; white-space:nowrap; }
     .data-table-wrap tr:hover td { background:#F9F9F9; }
     .chart-wrap h3 { font-size: 13px; font-weight: 700; margin-bottom: 16px; }
 
@@ -1082,7 +1080,7 @@ function buildTable(wrapperId, rows, cols) {
   if (!wrap) return;
   if (!rows.length) { wrap.innerHTML = '<p style="color:#999;font-size:12px">データがありません</p>'; return; }
 
-  // 合計行
+  // 合計・平均を計算
   const totals = {};
   cols.forEach(c => {
     if (c.sum === 'sum') {
@@ -1093,29 +1091,34 @@ function buildTable(wrapperId, rows, cols) {
     }
   });
 
-  const th = cols.map(c => `<th>${c.head}</th>`).join('');
-  const trs = rows.map(r => {
-    const tds = cols.map(c => `<td>${c.fmt(r)}</td>`).join('');
-    return `<tr>${tds}</tr>`;
-  }).join('');
-
-  // 合計行描画
-  const sumTds = cols.map(c => {
-    if (!c.sum) return `<td>${c.key==='date' ? '合計 / 平均' : ''}</td>`;
+  // 合計セルの値を文字列に変換
+  function fmtTotal(c) {
     const v = totals[c.key];
-    if (v == null) return '<td>—</td>';
-    if (c.sum==='sum') {
-      if (c.head.includes('¥')) return `<td>¥${Math.round(v).toLocaleString()}</td>`;
-      return `<td>${Math.round(v).toLocaleString()}</td>`;
-    }
-    if (c.sum==='avg') {
-      if (c.head.includes('¥')) return `<td>¥${Math.round(v).toLocaleString()}</td>`;
-      return `<td>${v.toFixed(2)}</td>`;
-    }
-    return '<td>—</td>';
+    if (v == null) return '—';
+    if (c.sum === 'sum') return c.head.includes('¥') ? '¥'+Math.round(v).toLocaleString() : Math.round(v).toLocaleString();
+    if (c.sum === 'avg') return c.head.includes('¥') ? '¥'+Math.round(v).toLocaleString() : v.toFixed(2);
+    return '—';
+  }
+
+  // 転置テーブル：行＝指標、列＝日付
+  // ヘッダー行（日付）
+  const dateCol = cols.find(c => c.key === 'date');
+  const dateThs = rows.map(r => `<th>${dateCol ? dateCol.fmt(r) : r.date}</th>`).join('');
+  const sumLabel = '<th style="background:#E8F5E9;color:#388E3C">合計/平均</th>';
+
+  // データ行（指標ごと）
+  const dataRows = cols.filter(c => c.key !== 'date').map(c => {
+    const tds = rows.map(r => `<td>${c.fmt(r)}</td>`).join('');
+    const sumTd = c.sum
+      ? `<td style="font-weight:700;background:#F1F8E9;color:#388E3C">${fmtTotal(c)}</td>`
+      : '<td>—</td>';
+    return `<tr><th>${c.head}</th>${tds}${sumTd}</tr>`;
   }).join('');
 
-  wrap.innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${trs}<tr>${sumTds}</tr></tbody></table>`;
+  wrap.innerHTML = `<table>
+    <thead><tr><th></th>${dateThs}${sumLabel}</tr></thead>
+    <tbody>${dataRows}</tbody>
+  </table>`;
 }
 
 function exportCSV(type) {
