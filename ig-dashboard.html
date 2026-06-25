@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>インスタ担当ダッシュボード | reCross</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Hiragino Sans','Helvetica Neue',sans-serif; background: #F7F8FA; color: #2D2D2D; font-size: 14px; }
+
+/* ヘッダー */
+.header { background: #2D2D2D; color: #fff; padding: 0 20px; display: flex; align-items: center; gap: 16px; height: 52px; position: sticky; top: 0; z-index: 100; }
+.header-title { font-size: 16px; font-weight: 800; letter-spacing: 0.03em; }
+.header-sub { font-size: 12px; color: #aaa; }
+.header-spacer { flex: 1; }
+.header a { color: #aaa; font-size: 12px; text-decoration: none; padding: 6px 12px; border: 1px solid #555; border-radius: 7px; }
+.header a:hover { background: rgba(255,255,255,0.1); }
+
+/* タブ */
+.tabs { display: flex; background: #fff; border-bottom: 1px solid #E8E8E8; padding: 0 20px; }
+.tab { padding: 14px 20px; font-size: 14px; font-weight: 700; cursor: pointer; border-bottom: 3px solid transparent; color: #888; transition: all 0.15s; }
+.tab.active { color: #E64A19; border-bottom-color: #E64A19; }
+.tab-content { display: none; padding: 20px; max-width: 1000px; margin: 0 auto; }
+.tab-content.active { display: block; }
+
+/* セクションヘッダー */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-title { font-size: 16px; font-weight: 800; }
+.section-desc { font-size: 12px; color: #888; margin-top: 2px; }
+
+/* ボタン */
+.btn { border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+.btn:hover { opacity: 0.85; }
+.btn-primary { background: #E64A19; color: #fff; }
+.btn-blue { background: #0050B3; color: #fff; }
+.btn-outline { background: none; border: 1px solid #CCC; color: #555; }
+.btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 6px; }
+
+/* 投稿候補カード */
+.candidates-grid { display: flex; flex-direction: column; gap: 10px; }
+.candidate-card { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 14px; }
+.candidate-card.done { opacity: 0.45; }
+.candidate-status { flex-shrink: 0; }
+.status-badge { display: inline-block; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.status-candidate { background: #E3F2FD; color: #1565C0; }
+.status-progress  { background: #FFF3E0; color: #E65100; }
+.status-done      { background: #E8F5E9; color: #2E7D32; }
+.candidate-body { flex: 1; }
+.candidate-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.candidate-meta { display: flex; gap: 12px; font-size: 12px; color: #888; flex-wrap: wrap; }
+.candidate-tag { background: #F5F5F5; border-radius: 4px; padding: 2px 7px; font-size: 11px; color: #555; }
+.candidate-reason { font-size: 12px; color: #1565C0; background: #E3F2FD; border-radius: 6px; padding: 4px 8px; margin-top: 6px; display: inline-block; }
+.candidate-note { margin-top: 8px; }
+.candidate-note input { width: 100%; border: 1px solid #E8E8E8; border-radius: 6px; padding: 6px 10px; font-size: 12px; color: #555; outline: none; }
+.candidate-note input:focus { border-color: #E64A19; }
+.candidate-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.candidate-del { flex-shrink: 0; color: #ccc; cursor: pointer; font-size: 18px; line-height: 1; margin-top: 2px; }
+.candidate-del:hover { color: #E53935; }
+
+/* 候補なし */
+.empty-state { text-align: center; padding: 40px; color: #aaa; }
+.empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+
+/* 手動追加フォーム */
+.add-form { background: #fff; border: 1px dashed #CCC; border-radius: 12px; padding: 16px; margin-bottom: 16px; display: none; }
+.add-form.open { display: block; }
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 11px; font-weight: 700; color: #888; }
+.form-group input, .form-group select, .form-group textarea {
+  border: 1px solid #E8E8E8; border-radius: 7px; padding: 8px 10px; font-size: 13px;
+  outline: none; font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #E64A19; }
+
+/* 仕切り */
+.divider { border: none; border-top: 1px solid #EBEBEB; margin: 20px 0; }
+
+/* 広告ブリーフ */
+.brief-list { display: flex; flex-direction: column; gap: 12px; }
+.brief-card { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; overflow: hidden; }
+.brief-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
+.brief-header:hover { background: #FAFAFA; }
+.brief-num { background: #E64A19; color: #fff; border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+.brief-period { font-size: 14px; font-weight: 700; }
+.brief-kpis { display: flex; gap: 10px; font-size: 12px; color: #888; flex-wrap: wrap; }
+.brief-kpi { background: #F5F5F5; border-radius: 4px; padding: 2px 8px; }
+.brief-expand { margin-left: auto; color: #aaa; font-size: 18px; }
+.brief-body { padding: 0 16px 16px; display: none; }
+.brief-body.open { display: block; }
+.brief-section { margin-top: 14px; }
+.brief-section-title { font-size: 11px; font-weight: 800; color: #888; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #F0F0F0; }
+.brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.brief-field { display: flex; flex-direction: column; gap: 3px; }
+.brief-field label { font-size: 11px; color: #888; font-weight: 700; }
+.brief-field .val { font-size: 13px; color: #2D2D2D; white-space: pre-wrap; word-break: break-word; }
+.brief-field .val.highlight { color: #E64A19; font-weight: 700; }
+
+/* ブリーフ作成モーダル */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 500; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: #fff; border-radius: 16px; padding: 24px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal h2 { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+.modal .modal-sub { font-size: 12px; color: #888; margin-bottom: 20px; }
+.modal-section-title { font-size: 11px; font-weight: 800; color: #888; letter-spacing: 0.08em; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #EBEBEB; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.btn-cancel { background: none; border: 1px solid #CCC; color: #555; }
+
+/* フィルター */
+.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.filter-btn { background: #fff; border: 1px solid #E8E8E8; border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 700; cursor: pointer; color: #888; }
+.filter-btn.active { background: #2D2D2D; color: #fff; border-color: #2D2D2D; }
+
+/* CSV提案バナー */
+.csv-banner { background: #E3F2FD; border: 1px solid #BBDEFB; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+.csv-banner-text { flex: 1; font-size: 13px; color: #1565C0; }
+.csv-banner-text strong { font-weight: 800; }
+
+/* tip */
+.tip { background: #FFF8E1; border-left: 4px solid #FFB300; border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 12px; color: #5D4037; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">📸 インスタ担当ダッシュボード</div>
+    <div class="header-sub">reCross リクロス ／ 楽天市場店</div>
+  </div>
+  <div class="header-spacer"></div>
+  <a href="./dashboard.html">← メインダッシュボード</a>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('posts', this)">📝 投稿候補リスト</div>
+  <div class="tab" onclick="switchTab('brief', this)">📋 広告ブリーフ</div>
+</div>
+
+<!-- ===== 投稿候補タブ ===== -->
+<div class="tab-content active" id="tab-posts">
+
+  <div class="section-header" style="margin-top:4px;">
+    <div>
+      <div class="section-title">📝 投稿候補リスト</div>
+      <div class="section-desc">「候補」→「制作中」→「投稿済」の順にステータスを進めてください</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <input type="file" id="item-csv-input" accept=".csv" style="display:none" onchange="importItemCSV(this)">
+      <button class="btn btn-blue" onclick="document.getElementById('item-csv-input').click()">📊 商品CSV取込</button>
+      <button class="btn btn-primary" onclick="toggleAddForm()">＋ 手動追加</button>
+    </div>
+  </div>
+
+  <div class="tip">💡 <strong>商品CSV取込</strong>：楽天RMS「商品ページ分析」CSVを読み込むと、CVRが高くてアクセスが少ない商品を自動で候補に追加します。</div>
+
+  <!-- 手動追加フォーム -->
+  <div class="add-form" id="add-form">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;">✏️ 投稿候補を手動追加</div>
+    <div class="form-row">
+      <div class="form-group" style="flex:2;min-width:200px;">
+        <label>投稿テーマ・商品名 *</label>
+        <input type="text" id="add-name" placeholder="例：JE-343F フリルショルダー 春コーデ" />
+      </div>
+      <div class="form-group" style="flex:1;min-width:120px;">
+        <label>種類</label>
+        <select id="add-type">
+          <option value="product">商品紹介</option>
+          <option value="lifestyle">ライフスタイル</option>
+          <option value="campaign">セール・キャンペーン</option>
+          <option value="reel">リール</option>
+          <option value="other">その他</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;min-width:200px;">
+        <label>メモ・訴求ポイント</label>
+        <input type="text" id="add-note" placeholder="例：大容量・軽量・ダイバー素材をアピール" />
+      </div>
+      <div class="form-group" style="min-width:140px;">
+        <label>希望投稿日</label>
+        <input type="date" id="add-date" />
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-primary" onclick="addManualCandidate()">追加する</button>
+      <button class="btn btn-outline" onclick="toggleAddForm()">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- フィルター -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all', this)">すべて</button>
+    <button class="filter-btn" onclick="setFilter('candidate', this)">🔵 候補</button>
+    <button class="filter-btn" onclick="setFilter('progress', this)">🟡 制作中</button>
+    <button class="filter-btn" onclick="setFilter('done', this)">✅ 投稿済</button>
+  </div>
+
+  <div class="candidates-grid" id="candidates-list">
+    <div class="empty-state"><div class="icon">📭</div>まだ候補がありません<br><small>商品CSVを取込むか、手動で追加してください</small></div>
+  </div>
+</div>
+
+<!-- ===== 広告ブリーフタブ ===== -->
+<div class="tab-content" id="tab-brief">
+
+  <div class="section-header" style="margin-top:4px;">
+    <div>
+      <div class="section-title">📋 広告ブリーフ</div>
+      <div class="section-desc">前回の振り返りと次回への指示をまとめたシートです</div>
+    </div>
+    <button class="btn btn-primary" onclick="openBriefModal()">＋ 新規ブリーフ作成</button>
+  </div>
+
+  <div class="brief-list" id="brief-list">
+    <div class="empty-state"><div class="icon">📋</div>まだブリーフがありません<br><small>「新規ブリーフ作成」から追加してください</small></div>
+  </div>
+</div>
+
+<!-- ===== ブリーフ作成モーダル ===== -->
+<div class="modal-overlay" id="brief-modal" onclick="if(event.target===this)closeBriefModal()">
+  <div class="modal">
+    <h2>📋 広告ブリーフ作成</h2>
+    <div class="modal-sub">前回の振り返りと次回の指示を記録します</div>
+
+    <div class="modal-section-title">📅 基本情報</div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>タイトル（例：6月マラソン広告）</label>
+        <input type="text" id="b-title" placeholder="7月マラソン広告" />
+      </div>
+      <div class="form-group">
+        <label>配信期間</label>
+        <input type="text" id="b-period" placeholder="2026/07/04〜07/11" />
+      </div>
+    </div>
+
+    <div class="modal-section-title">⏪ 前回の振り返り</div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>前回のCTR</label>
+        <input type="text" id="b-prev-ctr" placeholder="7.16%" />
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>前回のCPC</label>
+        <input type="text" id="b-prev-cpc" placeholder="¥6" />
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>前回のROAS（Meta）</label>
+        <input type="text" id="b-prev-roas" placeholder="3611%" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>良かった点</label>
+        <textarea id="b-prev-good" rows="2" placeholder="CTR・CPCともに目標達成。バッグのフリル訴求が響いた。"></textarea>
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>改善すること</label>
+        <textarea id="b-prev-bad" rows="2" placeholder="フリークエンシーが高くなってきたためクリエイティブを刷新する。"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-section-title">⏩ 次回の指示</div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>訴求商品</label>
+        <input type="text" id="b-product" placeholder="JE-343F フリルショルダー" />
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>予算（日額）</label>
+        <input type="text" id="b-budget" placeholder="¥2,000/日" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>ターゲット</label>
+        <input type="text" id="b-target" placeholder="30〜50代女性 / ファッション興味" />
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>KPI目標</label>
+        <input type="text" id="b-kpi" placeholder="CTR 5%以上 / ROAS 1000%以上" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>クリエイティブ指示</label>
+        <textarea id="b-creative" rows="3" placeholder="・商品の軽量さと大容量を冒頭3秒で見せる&#10;・ナチュラル系の服と合わせたコーデ映像&#10;・テキスト：「1枚で様になる」"></textarea>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>参考画像・参考アカウントのメモ</label>
+        <textarea id="b-image-note" rows="2" placeholder="@xxx の○月○日の投稿のような雰囲気 / 明るめのトーンで撮影"></textarea>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>その他メモ</label>
+        <textarea id="b-note" rows="2" placeholder="マラソン開始2日前から配信開始すること"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-cancel" onclick="closeBriefModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveBrief()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Firebase ───────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAKdzWGn9542lPUpN7-jmHGGU_WlENMV58",
+  authDomain: "recross-dashboard.firebaseapp.com",
+  projectId: "recross-dashboard",
+  storageBucket: "recross-dashboard.firebasestorage.app",
+  messagingSenderId: "905935191675",
+  appId: "1:905935191675:web:1fab16ea88ea9ad9df6cde",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const IG_DOC = db.collection('dashboard').doc('ig');
+
+// ─── State ──────────────────────────────────
+let candidates = [];
+let briefs     = [];
+let currentFilter = 'all';
+
+// ─── Firestore sync ─────────────────────────
+IG_DOC.onSnapshot(snap => {
+  const data = snap.data() || {};
+  candidates = data.candidates || [];
+  briefs     = (data.briefs || []).slice().reverse(); // 新しい順
+  renderCandidates();
+  renderBriefs();
+});
+
+function save() {
+  IG_DOC.set({
+    candidates: candidates,
+    briefs: [...briefs].reverse(), // 古い順で保存
+  }, { merge: true });
+}
+
+// ─── タブ切替 ────────────────────────────────
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ─── フィルター ──────────────────────────────
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderCandidates();
+}
+
+// ─── 投稿候補レンダリング ─────────────────────
+const statusLabel = { candidate:'🔵 候補', progress:'🟡 制作中', done:'✅ 投稿済' };
+const statusClass = { candidate:'status-candidate', progress:'status-progress', done:'status-done' };
+const typeLabel   = { product:'商品紹介', lifestyle:'ライフスタイル', campaign:'セール', reel:'リール', other:'その他' };
+
+function renderCandidates() {
+  const list = document.getElementById('candidates-list');
+  let items = currentFilter === 'all'
+    ? candidates
+    : candidates.filter(c => c.status === currentFilter);
+
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📭</div>${currentFilter === 'all' ? 'まだ候補がありません<br><small>商品CSVを取込むか、手動で追加してください</small>' : 'この状態の候補はありません'}</div>`;
+    return;
+  }
+
+  // ステータス順（候補 → 制作中 → 投稿済）
+  const order = { candidate:0, progress:1, done:2 };
+  items = [...items].sort((a,b) => order[a.status] - order[b.status]);
+
+  list.innerHTML = items.map((c, i) => {
+    const idx = candidates.indexOf(c);
+    return `<div class="candidate-card ${c.status === 'done' ? 'done' : ''}" id="card-${idx}">
+      <div class="candidate-status">
+        <span class="status-badge ${statusClass[c.status]}" onclick="cycleStatus(${idx})">${statusLabel[c.status]}</span>
+      </div>
+      <div class="candidate-body">
+        <div class="candidate-name">${escHtml(c.name)}</div>
+        <div class="candidate-meta">
+          ${c.type ? `<span class="candidate-tag">${typeLabel[c.type]||c.type}</span>` : ''}
+          ${c.cvr ? `<span>CVR <strong>${c.cvr}</strong></span>` : ''}
+          ${c.access ? `<span>アクセス <strong>${Number(c.access).toLocaleString()}人</strong></span>` : ''}
+          ${c.sales ? `<span>売上 <strong>¥${Number(c.sales).toLocaleString()}</strong></span>` : ''}
+          ${c.scheduledDate ? `<span>📅 ${c.scheduledDate}</span>` : ''}
+        </div>
+        ${c.reason ? `<div class="candidate-reason">💡 ${escHtml(c.reason)}</div>` : ''}
+        <div class="candidate-note">
+          <input type="text" placeholder="メモ・訴求ポイントを入力..." value="${escHtml(c.note||'')}"
+            onchange="updateNote(${idx}, this.value)" />
+        </div>
+      </div>
+      <span class="candidate-del" onclick="deleteCandidate(${idx})">×</span>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function cycleStatus(idx) {
+  const order = ['candidate','progress','done'];
+  const cur = candidates[idx].status || 'candidate';
+  candidates[idx].status = order[(order.indexOf(cur)+1) % order.length];
+  save();
+}
+
+function updateNote(idx, val) {
+  candidates[idx].note = val;
+  save();
+}
+
+function deleteCandidate(idx) {
+  if (!confirm('この候補を削除しますか？')) return;
+  candidates.splice(idx, 1);
+  save();
+}
+
+// ─── 手動追加 ────────────────────────────────
+function toggleAddForm() {
+  const f = document.getElementById('add-form');
+  f.classList.toggle('open');
+}
+
+function addManualCandidate() {
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { alert('テーマ・商品名を入力してください'); return; }
+  candidates.unshift({
+    id: Date.now().toString(),
+    name,
+    type: document.getElementById('add-type').value,
+    note: document.getElementById('add-note').value.trim(),
+    scheduledDate: document.getElementById('add-date').value,
+    status: 'candidate',
+    source: 'manual',
+  });
+  save();
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-note').value = '';
+  document.getElementById('add-date').value = '';
+  document.getElementById('add-form').classList.remove('open');
+}
+
+// ─── 商品CSV取込 ─────────────────────────────
+function importItemCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result;
+      const lines = text.split('\n');
+      // ヘッダー行を探す（#, ジャンル で始まる行）
+      const headerIdx = lines.findIndex(l => l.startsWith('#,') || l.startsWith('﻿#,') || l.replace(/^﻿/,'').startsWith('#,'));
+      if (headerIdx < 0) { alert('商品ページ分析CSVのフォーマットに対応していません'); return; }
+
+      const headers = lines[headerIdx].replace(/^﻿/,'').split(',');
+      const col = name => headers.findIndex(h => h.trim() === name);
+      const iName  = col('商品名');
+      const iCode  = col('商品番号');
+      const iCvr   = col('転換率');
+      const iAcc   = col('アクセス人数');
+      const iSales = col('売上');
+
+      let added = 0;
+      const existingIds = new Set(candidates.map(c => c.id));
+
+      for (let i = headerIdx + 1; i < lines.length; i++) {
+        const row = parseCSVLine(lines[i]);
+        if (!row || row.length < 5) continue;
+        const code  = (row[iCode]  || '').trim();
+        const name  = (row[iName]  || '').trim().slice(0, 60) + (row[iName]?.length > 60 ? '…' : '');
+        const cvrStr= (row[iCvr]   || '').replace('%','').trim();
+        const cvr   = parseFloat(cvrStr) || 0;
+        const acc   = parseInt((row[iAcc]  || '').replace(/,/g,'')) || 0;
+        const sales = parseInt((row[iSales]|| '').replace(/,/g,'')) || 0;
+
+        if (!code || !name) continue;
+        // CVR ≥ 2% かつ アクセス ≤ 800人 → 候補（高CVR・低流入）
+        if (cvr < 2.0 || acc > 800) continue;
+        // 既存と重複チェック
+        if (existingIds.has(code)) continue;
+
+        candidates.push({
+          id: code,
+          name: code ? `${code} ${name}` : name,
+          cvr: cvrStr + '%',
+          access: acc,
+          sales: sales,
+          status: 'candidate',
+          source: 'csv',
+          reason: `CVR ${cvrStr}% と高いのにアクセスが${acc.toLocaleString()}人と少ない→インスタで押すと伸びやすい`,
+          note: '',
+          type: 'product',
+        });
+        existingIds.add(code);
+        added++;
+      }
+
+      save();
+      alert(added > 0
+        ? `${added}件の候補を追加しました（CVR2%以上かつアクセス800人以下の商品）`
+        : 'CVR2%以上かつアクセス800人以下の商品は見つかりませんでした。基準を確認してください。');
+    } catch(err) {
+      alert('CSV読み込みエラー: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+// ─── 広告ブリーフ ─────────────────────────────
+function renderBriefs() {
+  const list = document.getElementById('brief-list');
+  if (!briefs.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📋</div>まだブリーフがありません<br><small>「新規ブリーフ作成」から追加してください</small></div>`;
+    return;
+  }
+  list.innerHTML = briefs.map((b, i) => `
+    <div class="brief-card">
+      <div class="brief-header" onclick="toggleBrief(${i})">
+        <span class="brief-num">#${briefs.length - i}</span>
+        <div>
+          <div class="brief-period">${escHtml(b.title || b.period || '無題のブリーフ')}</div>
+          <div class="brief-kpis">
+            ${b.period ? `<span class="brief-kpi">📅 ${escHtml(b.period)}</span>` : ''}
+            ${b.prevCtr ? `<span class="brief-kpi">前CTR ${escHtml(b.prevCtr)}</span>` : ''}
+            ${b.prevCpc ? `<span class="brief-kpi">前CPC ${escHtml(b.prevCpc)}</span>` : ''}
+            ${b.product ? `<span class="brief-kpi">商品：${escHtml(b.product)}</span>` : ''}
+          </div>
+        </div>
+        <div class="brief-expand" id="brief-arrow-${i}">▼</div>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();deleteBrief(${i})" style="color:#E53935;border-color:#FFCDD2;">削除</button>
+      </div>
+      <div class="brief-body" id="brief-body-${i}">
+        <div class="brief-section">
+          <div class="brief-section-title">⏪ 前回の振り返り</div>
+          <div class="brief-grid">
+            <div class="brief-field"><label>CTR</label><div class="val highlight">${escHtml(b.prevCtr||'—')}</div></div>
+            <div class="brief-field"><label>CPC</label><div class="val highlight">${escHtml(b.prevCpc||'—')}</div></div>
+            <div class="brief-field"><label>ROAS（Meta）</label><div class="val highlight">${escHtml(b.prevRoas||'—')}</div></div>
+            <div></div>
+            <div class="brief-field"><label>良かった点</label><div class="val">${escHtml(b.prevGood||'—')}</div></div>
+            <div class="brief-field"><label>改善すること</label><div class="val">${escHtml(b.prevBad||'—')}</div></div>
+          </div>
+        </div>
+        <div class="brief-section">
+          <div class="brief-section-title">⏩ 次回の指示</div>
+          <div class="brief-grid">
+            <div class="brief-field"><label>訴求商品</label><div class="val highlight">${escHtml(b.product||'—')}</div></div>
+            <div class="brief-field"><label>予算</label><div class="val">${escHtml(b.budget||'—')}</div></div>
+            <div class="brief-field"><label>ターゲット</label><div class="val">${escHtml(b.target||'—')}</div></div>
+            <div class="brief-field"><label>KPI目標</label><div class="val">${escHtml(b.kpi||'—')}</div></div>
+          </div>
+          <div class="brief-field" style="margin-top:10px;"><label>クリエイティブ指示</label><div class="val">${escHtml(b.creative||'—')}</div></div>
+          <div class="brief-field" style="margin-top:10px;"><label>参考画像・アカウントメモ</label><div class="val">${escHtml(b.imageNote||'—')}</div></div>
+          ${b.note ? `<div class="brief-field" style="margin-top:10px;"><label>その他メモ</label><div class="val">${escHtml(b.note)}</div></div>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleBrief(i) {
+  const body  = document.getElementById(`brief-body-${i}`);
+  const arrow = document.getElementById(`brief-arrow-${i}`);
+  const open  = body.classList.toggle('open');
+  arrow.textContent = open ? '▲' : '▼';
+}
+
+function openBriefModal() {
+  // 最新ブリーフのデータを前回値として自動入力
+  const last = briefs[0];
+  document.getElementById('b-title').value     = '';
+  document.getElementById('b-period').value    = '';
+  document.getElementById('b-prev-ctr').value  = last?.prevCtr  || '';
+  document.getElementById('b-prev-cpc').value  = last?.prevCpc  || '';
+  document.getElementById('b-prev-roas').value = last?.prevRoas || '';
+  document.getElementById('b-prev-good').value = '';
+  document.getElementById('b-prev-bad').value  = '';
+  document.getElementById('b-product').value   = '';
+  document.getElementById('b-budget').value    = last?.budget   || '';
+  document.getElementById('b-target').value    = last?.target   || '';
+  document.getElementById('b-kpi').value       = last?.kpi      || '';
+  document.getElementById('b-creative').value  = '';
+  document.getElementById('b-image-note').value= '';
+  document.getElementById('b-note').value      = '';
+  document.getElementById('brief-modal').classList.add('open');
+}
+
+function closeBriefModal() {
+  document.getElementById('brief-modal').classList.remove('open');
+}
+
+function saveBrief() {
+  const title = document.getElementById('b-title').value.trim();
+  if (!title) { alert('タイトルを入力してください'); return; }
+  const brief = {
+    id: Date.now().toString(),
+    title,
+    period:   document.getElementById('b-period').value.trim(),
+    prevCtr:  document.getElementById('b-prev-ctr').value.trim(),
+    prevCpc:  document.getElementById('b-prev-cpc').value.trim(),
+    prevRoas: document.getElementById('b-prev-roas').value.trim(),
+    prevGood: document.getElementById('b-prev-good').value.trim(),
+    prevBad:  document.getElementById('b-prev-bad').value.trim(),
+    product:  document.getElementById('b-product').value.trim(),
+    budget:   document.getElementById('b-budget').value.trim(),
+    target:   document.getElementById('b-target').value.trim(),
+    kpi:      document.getElementById('b-kpi').value.trim(),
+    creative: document.getElementById('b-creative').value.trim(),
+    imageNote:document.getElementById('b-image-note').value.trim(),
+    note:     document.getElementById('b-note').value.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  // briefs は表示が新しい順、保存は古い順なので逆転して追加
+  const stored = [...briefs].reverse();
+  stored.push(brief);
+  IG_DOC.set({ briefs: stored }, { merge: true });
+  closeBriefModal();
+}
+
+function deleteBrief(i) {
+  if (!confirm('このブリーフを削除しますか？')) return;
+  const stored = [...briefs].reverse();
+  stored.splice(briefs.length - 1 - i, 1);
+  IG_DOC.set({ briefs: stored }, { merge: true });
+}
+</script>
+</body>
+</html>
