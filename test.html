@@ -231,6 +231,34 @@
     .gantt-group-row:first-child { border-top:none; }
     .gantt-group-label { width:150px; min-width:150px; flex-shrink:0; padding:7px 12px; font-size:12px; font-weight:700; color:#555; border-right:2px solid #E8E8E8; background:#F5F5F5; position:sticky; left:0; z-index:2; display:flex; align-items:center; gap:6px; }
     .gantt-group-fill { flex:1; background:#F5F5F5; }
+
+    /* ── 相関分析：総合判定カード ── */
+    #corr-verdict { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+    .verdict-card { background:#fff; border:2px solid #E0E0E0; border-radius:12px; padding:14px 16px; min-width:140px; flex:1; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+    .verdict-card.good { border-color:#66BB6A; background:#F1F8E9; }
+    .verdict-card.warn { border-color:#FFA726; background:#FFF8E1; }
+    .verdict-card.bad  { border-color:#EF5350; background:#FFEBEE; }
+    .verdict-card.na   { border-color:#BDBDBD; background:#FAFAFA; }
+    .verdict-emoji  { font-size:26px; margin-bottom:4px; }
+    .verdict-label  { font-size:11px; color:#666; margin-bottom:6px; line-height:1.3; }
+    .verdict-val    { font-size:20px; font-weight:700; color:#212121; }
+    .verdict-status { font-size:12px; font-weight:700; margin-top:4px; }
+    .verdict-card.good .verdict-status { color:#388E3C; }
+    .verdict-card.warn .verdict-status { color:#E65100; }
+    .verdict-card.bad  .verdict-status { color:#C62828; }
+    .verdict-card.na   .verdict-status { color:#757575; }
+    .verdict-hint   { font-size:10px; color:#9E9E9E; margin-top:2px; }
+
+    /* ── 相関分析：次にすべきこと ── */
+    .corr-actions-box { background:#fff; border:1px solid #E0E0E0; border-radius:10px; padding:14px 16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+    .corr-actions-title { font-size:13px; font-weight:700; color:#424242; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #F0F0F0; }
+    .corr-action-item { display:flex; gap:8px; padding:6px 0; font-size:13px; line-height:1.5; color:#424242; border-bottom:1px solid #F9F9F9; }
+    .corr-action-item:last-child { border-bottom:none; }
+    .corr-action-icon { flex-shrink:0; width:20px; }
+
+    /* ── 相関分析：カレンダーイベント凡例 ── */
+    .corr-event-legend { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:11px; }
+    .corr-event-badge { padding:2px 8px; border-radius:10px; color:#fff; font-weight:600; font-size:10px; }
   </style>
 </head>
 <body>
@@ -250,27 +278,31 @@
 
   <!-- メインアクションバー -->
   <div style="margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <!-- IG・サーチ流入（メインボタン） -->
+    <!-- 楽天CSV -->
+    <button class="entry-btn" onclick="document.getElementById('rakuten-csv-input').click()" style="margin-top:0;background:#BF0000;padding:10px 18px;font-size:13px;">
+      🛒 楽天 CSV
+    </button>
+    <input type="file" id="rakuten-csv-input" accept=".csv" style="display:none" onchange="importRakutenCSV(this)">
+    <!-- Meta広告CSV -->
+    <button class="entry-btn" onclick="document.getElementById('csv-input').click()" style="margin-top:0;background:#555;padding:10px 18px;font-size:13px;">
+      📣 Meta広告 CSV
+    </button>
+    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
+    <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
+    <!-- IG・サーチ流入 -->
     <button class="entry-btn" onclick="openIgModal()" style="margin-top:0;background:#E64A19;padding:10px 18px;font-size:13px;">
       📸 IG・サーチ流入入力
     </button>
-    <!-- hidden inputs -->
-    <input type="file" id="rakuten-csv-input" accept=".csv" style="display:none" onchange="importRakutenCSV(this)">
-    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
-    <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
     <!-- 区切り -->
     <div style="flex:1;"></div>
     <!-- 印刷 -->
     <button onclick="openReport()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 16px;font-size:13px;color:#555;cursor:pointer;white-space:nowrap;">
       🖨️ レポート印刷
     </button>
-    <!-- その他メニュー -->
+    <!-- その他（手動入力） -->
     <div style="position:relative;">
       <button id="more-btn" onclick="toggleMoreMenu()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 12px;font-size:13px;color:#555;cursor:pointer;">⋯</button>
-      <div id="more-menu" style="display:none;position:absolute;top:42px;right:0;background:#fff;border:1px solid #E0E0E0;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:100;min-width:180px;padding:6px 0;">
-        <button onclick="document.getElementById('rakuten-csv-input').click();toggleMoreMenu()" style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:#333;">🛒 楽天CSV を取り込む</button>
-        <button onclick="document.getElementById('csv-input').click();toggleMoreMenu()" style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:#333;">📣 Meta広告CSV を取り込む</button>
-        <div style="border-top:1px solid #F0F0F0;margin:4px 0;"></div>
+      <div id="more-menu" style="display:none;position:absolute;top:42px;right:0;background:#fff;border:1px solid #E0E0E0;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:100;min-width:160px;padding:6px 0;">
         <button onclick="openModal();toggleMoreMenu()" style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:#333;">✏️ データを手入力する</button>
       </div>
     </div>
@@ -318,17 +350,11 @@
     <div id="event-list" style="padding:0 16px 10px;"></div>
   </details>
 
-  <!-- 社長向けサマリー -->
-  <div id="top-summary" style="margin-top:20px;background:#fff;border:1px solid #EBEBEB;border-radius:12px;padding:16px 20px;">
-    <div style="font-size:11px;font-weight:700;color:#888;letter-spacing:0.08em;margin-bottom:12px;" id="summary-period-label">今月のサマリー</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;" id="summary-cards"></div>
-  </div>
-
   <!-- ③ データタブ -->
   <div class="tabs">
     <div class="tab" onclick="switchTab('calendar')">📅 カレンダー</div>
     <div class="tab active" onclick="switchTab('sales')">🛒 売上・アクセス</div>
-    <div class="tab" onclick="switchTab('ig')">📸 Instagram</div>
+    <div class="tab" onclick="switchTab('ad')">📣 インスタ広告</div>
     <div class="tab" onclick="switchTab('correlation')">📊 相関分析</div>
     <div class="tab" onclick="switchTab('history')">📋 履歴</div>
   </div>
@@ -406,43 +432,23 @@
     </div>
   </div>
 
-  <!-- Instagramタブ（統合） -->
-  <div class="tab-content" id="tab-ig">
-    <div class="kpi-period" id="kpi-ig-period"></div>
-    <div class="kpi-row" id="kpi-ig"></div>
-    <div class="chart-wrap">
-      <h3>IG→楽天 流入推移<span class="tip" data-tip="InstagramからQRコードや広告経由で楽天ショップに来たアクセス人数の推移。出所：楽天RMS「参照元・検索キーワード分析」手入力">?</span></h3>
-      <canvas id="chart-ig-visitors" height="80"></canvas>
-    </div>
-    <div class="chart-wrap">
-      <h3>CTR推移（目標：1.5%）<span class="tip" data-tip="クリック率の日別推移。広告を見た人のうちクリックした割合。1.5%以上が目標。出所：Meta広告マネージャ CSV">?</span></h3>
-      <canvas id="chart-ig-ctr" height="80"></canvas>
-    </div>
-    <div class="chart-wrap">
-      <h3>CPC推移（目標：¥30以下）<span class="tip" data-tip="クリック単価の日別推移。1クリックにかかった広告費。¥30以下が目標。出所：Meta広告マネージャ CSV">?</span></h3>
-      <canvas id="chart-ig-cpc" height="80"></canvas>
-    </div>
-    <div class="chart-wrap">
-      <h3>ROAS推移（売上 ÷ 広告費）<span class="tip" data-tip="広告費対売上比率。1000%＝広告費の10倍売れた状態。出所：楽天RMS CSV＋Meta広告 CSV">?</span></h3>
-      <canvas id="chart-ig-roas" height="80"></canvas>
-    </div>
-    <div class="chart-wrap">
-      <h3>IG流入 vs 売上（散布図）<span class="tip tip-left" data-tip="横軸：IG→楽天への流入人数。縦軸：その日の売上。点が右上に集まるほどIGからの流入が売上に結びついている。">?</span></h3>
-      <canvas id="chart-ig-scatter" height="80"></canvas>
-    </div>
-  </div>
-
   <!-- 相関分析タブ -->
   <div class="tab-content" id="tab-correlation">
     <div class="kpi-period" id="kpi-corr-period"></div>
+    <!-- ① 総合判定カード -->
+    <div id="corr-verdict"></div>
+    <!-- ② 次にすべきこと -->
+    <div id="corr-actions"></div>
     <div class="kpi-row" id="kpi-roas"></div>
     <div class="chart-wrap">
       <h3>売上 vs 広告クリック数（2軸）<span class="tip" data-tip="棒グラフ（左軸）：楽天売上。折れ線（右軸）：Meta広告クリック数。広告を強化した日の数日後に売上が上がっているか確認するためのグラフ。出所：楽天RMS CSV＋Meta広告 CSV">?</span></h3>
       <canvas id="chart-sales-vs-clicks" height="80"></canvas>
+      <div class="corr-event-legend" id="legend-sales-vs-clicks"></div>
     </div>
     <div class="chart-wrap">
       <h3>ROAS推移（売上 ÷ 広告費）<span class="tip" data-tip="ROAS（ロアス）＝広告費対売上比率。広告1円あたり何円売れたかを示す。1000%＝10倍の売上。広告費¥100未満の日は除外。出所：楽天RMS CSV＋Meta広告 CSV">?</span></h3>
       <canvas id="chart-roas" height="80"></canvas>
+      <div class="corr-event-legend" id="legend-roas"></div>
     </div>
     <div class="chart-wrap">
       <h3>IG流入 vs 売上（散布図）<span class="tip tip-left" data-tip="横軸：IG→楽天への流入人数。縦軸：その日の売上。点が右上に集まるほどIGからの流入が売上に結びついていることを示す。IG流入データを手入力で蓄積するほど精度が上がります。">?</span></h3>
@@ -981,6 +987,9 @@ function renderKPIs() {
     kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷広告クリック', null, null, '広告をクリックした人のうち\n実際に楽天ショップへ流入した割合。\n計算：IG→楽天流入数 ÷ 広告クリック数 × 100\n出所：Meta CSV ＋ 楽天RMS手入力'),
     kpiCard('クリック単価（CPC）', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
   ].join('');
+
+  // ① 総合判定カード ＋ ② 次にすべきこと
+  renderCorrelationSummary(roas, ctr, tIg, tBudget);
 }
 
 function kpiCard(label, value, decimals, unit, target, colorFn, wow, tip) {
@@ -999,6 +1008,98 @@ function kpiCard(label, value, decimals, unit, target, colorFn, wow, tip) {
     </div>
     ${target ? `<div class="kpi-target">${target}</div>` : ''}
   </div>`;
+}
+
+// ─────────────────────────────────────────────
+// ① 総合判定カード ＋ ② 次にすべきこと（相関分析タブ）
+// ─────────────────────────────────────────────
+function renderCorrelationSummary(roas, ctr, tIg, tBudget) {
+  const verdictEl  = document.getElementById('corr-verdict');
+  const actionsEl  = document.getElementById('corr-actions');
+  if (!verdictEl || !actionsEl) return;
+
+  // ── ① 判定ロジック ──
+  function judge(val, good, ok) {
+    if (val == null) return { emoji:'⚪', cls:'na', text:'データなし' };
+    if (val >= good) return { emoji:'🟢', cls:'good', text:'良好' };
+    if (val >= ok)   return { emoji:'🟡', cls:'warn', text:'要注意' };
+    return               { emoji:'🔴', cls:'bad',  text:'要改善' };
+  }
+  const roasJ = judge(roas,  1000, 500);
+  const ctrJ  = judge(ctr,   1.5,  1.0);
+  const igJ   = judge(tIg > 0 ? tIg : null, 500, 200);
+
+  verdictEl.innerHTML = `
+    <div class="verdict-card ${roasJ.cls}">
+      <div class="verdict-emoji">${roasJ.emoji}</div>
+      <div class="verdict-label">広告の費用対効果<br>（ROAS）</div>
+      <div class="verdict-val">${roas != null ? roas.toLocaleString() + '%' : '—'}</div>
+      <div class="verdict-status">${roasJ.text}</div>
+      <div class="verdict-hint">目標 1000%以上</div>
+    </div>
+    <div class="verdict-card ${ctrJ.cls}">
+      <div class="verdict-emoji">${ctrJ.emoji}</div>
+      <div class="verdict-label">広告クリック率<br>（CTR）</div>
+      <div class="verdict-val">${ctr != null ? ctr.toFixed(2) + '%' : '—'}</div>
+      <div class="verdict-status">${ctrJ.text}</div>
+      <div class="verdict-hint">目標 1.5%以上</div>
+    </div>
+    <div class="verdict-card ${igJ.cls}">
+      <div class="verdict-emoji">${igJ.emoji}</div>
+      <div class="verdict-label">IG→楽天<br>流入人数</div>
+      <div class="verdict-val">${(tIg > 0) ? tIg.toLocaleString() + '人' : '—'}</div>
+      <div class="verdict-status">${igJ.text}</div>
+      <div class="verdict-hint">月間目標 500人以上</div>
+    </div>
+  `;
+
+  // ── ② 次にすべきこと ──
+  const actions = [];
+  const hasAd = tBudget > 0;
+
+  if (!hasAd) {
+    actions.push({ icon:'📥', text:'Meta広告CSVを取り込むと、広告効果の分析ができるようになります。' });
+  } else {
+    // ROAS判定
+    if (roas == null) {
+      actions.push({ icon:'📥', text:'楽天売上CSVを取り込むと、ROASが計算できます。' });
+    } else if (roas >= 1000) {
+      actions.push({ icon:'✅', text:`ROAS ${roas.toLocaleString()}% — 広告効果は良好です。このまま継続し、予算を増やすことも検討できます。` });
+    } else if (roas >= 500) {
+      actions.push({ icon:'⚠️', text:`ROAS ${roas.toLocaleString()}% — 広告費は回収できていますが目標未達。効果が出た日・期間のクリエイティブを確認し、同じ内容で再出稿しましょう。` });
+    } else {
+      actions.push({ icon:'🚨', text:`ROAS ${roas.toLocaleString()}% — 広告費に見合った売上が出ていません。一時的に予算を抑え、過去に効果があったクリエイティブに絞って配信し直しましょう。` });
+    }
+
+    // CTR判定
+    if (ctr != null) {
+      if (ctr < 1.0) {
+        actions.push({ icon:'🎨', text:`CTR ${ctr.toFixed(2)}% — 広告は表示されているがクリックされていません。画像・キャプション・ターゲット設定を見直しましょう。` });
+      } else if (ctr < 1.5) {
+        actions.push({ icon:'🔍', text:`CTR ${ctr.toFixed(2)}% — クリック率がやや低め。パフォーマンスが高かった日の投稿を参考に、クリエイティブのA/Bテストを試してみましょう。` });
+      } else {
+        actions.push({ icon:'👍', text:`CTR ${ctr.toFixed(2)}% — 広告クリック率は良好。今のクリエイティブは引き続き使えます。` });
+      }
+    }
+
+    // IG流入判定
+    if (tIg <= 0) {
+      actions.push({ icon:'📝', text:'IG→楽天 流入データが未入力です。「IG・サーチ流入入力」から数値を入れると、広告との相関が分析できます。' });
+    } else if (tIg < 200) {
+      actions.push({ icon:'📸', text:`IG流入 ${tIg.toLocaleString()}人 — 少ない状態です。投稿へのリンク導線（プロフィールURL・ストーリーズ・QRコード）を増やしましょう。` });
+    } else if (tIg < 500) {
+      actions.push({ icon:'📈', text:`IG流入 ${tIg.toLocaleString()}人 — 増加中ですが月間目標500人まであと${(500 - tIg)}人。投稿頻度を上げるか、広告でリーチを広げましょう。` });
+    } else {
+      actions.push({ icon:'🎉', text:`IG流入 ${tIg.toLocaleString()}人 — 目標達成！次は流入後の購入率を上げるため、楽天ページの写真・説明文の改善も検討しましょう。` });
+    }
+  }
+
+  actionsEl.innerHTML = `
+    <div class="corr-actions-box">
+      <div class="corr-actions-title">📋 次にすべきこと</div>
+      ${actions.map(a => `<div class="corr-action-item"><span class="corr-action-icon">${a.icon}</span><span>${a.text}</span></div>`).join('')}
+    </div>
+  `;
 }
 
 // ─────────────────────────────────────────────
@@ -1148,18 +1249,102 @@ function renderCharts() {
     const s = Number(e.sales)||0, b = Number(e.budget)||0;
     return (s > 0 && b >= 100) ? Math.round(s / b * 100) : null; // 広告費¥100未満の日は除外
   });
-  makeChart('chart-sales-vs-clicks', 'bar', [
-    { label:'売上(¥)', data: d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.6)', yAxisID:'y' },
-    { label:'広告クリック', type:'line', data: d.map(e=>e.clicks||null), borderColor:'#7986CB', backgroundColor:'rgba(121,134,203,0.08)', tension:0.3, yAxisID:'y1', pointRadius:3, fill:true },
-  ], { scales: { ...CHART_DEFAULTS.scales,
-    y:  { grid:{color:'#F0F0F0'}, ticks:{font:{size:11}, callback:v=>'¥'+v.toLocaleString()} },
-    y1: { position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:11}}, title:{display:true,text:'クリック数',font:{size:10}} }
-  }});
 
-  makeChart('chart-roas', 'line', [
-    { label:'ROAS(%)', data: roasData, borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true, pointRadius:4 },
-    targetLine('目標1000%', 1000, '#FFB74D'),
-  ]);
+  // ③ カレンダーイベントをグラフに重ね表示するカスタムプラグイン
+  const chartLabels = l; // 現在のラベル配列（MM-DD or YYYY-MM）
+  function getOverlapEvents(chartDates) {
+    if (!calEventsCache || !chartDates.length) return [];
+    const minD = chartDates[0].date, maxD = chartDates[chartDates.length-1].date;
+    return calEventsCache.filter(ev => ev.start <= maxD && (ev.end || ev.start) >= minD);
+  }
+  function makeEventPlugin(chartDates) {
+    const evs = getOverlapEvents(chartDates);
+    return {
+      id: 'calEventLines',
+      afterDraw(chart) {
+        if (!evs.length) return;
+        const ctx = chart.ctx;
+        const { top, bottom } = chart.chartArea;
+        const meta = chart.getDatasetMeta(0);
+        if (!meta.data.length) return;
+        evs.forEach(ev => {
+          const startLabel = chartPeriod === 'month' ? ev.start?.slice(0,7) : ev.start?.slice(5);
+          const idx = chartLabels.indexOf(startLabel);
+          if (idx < 0) return;
+          const bar = meta.data[idx];
+          if (!bar) return;
+          const x = bar.x;
+          ctx.save();
+          ctx.strokeStyle = ev.color || '#FF6F00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 3]);
+          ctx.globalAlpha = 0.65;
+          ctx.beginPath();
+          ctx.moveTo(x, top);
+          ctx.lineTo(x, bottom);
+          ctx.stroke();
+          ctx.globalAlpha = 0.9;
+          ctx.setLineDash([]);
+          ctx.fillStyle = ev.color || '#FF6F00';
+          ctx.font = 'bold 9px sans-serif';
+          ctx.textAlign = 'left';
+          const label = ev.title.length > 8 ? ev.title.slice(0, 8) + '…' : ev.title;
+          ctx.fillText(label, x + 3, top + 13);
+          ctx.restore();
+        });
+      }
+    };
+  }
+
+  // イベント凡例を更新する関数
+  function renderEventLegend(legendId, chartDates) {
+    const el = document.getElementById(legendId);
+    if (!el) return;
+    const evs = getOverlapEvents(chartDates);
+    if (!evs.length) { el.innerHTML = ''; return; }
+    el.innerHTML = evs.map(ev =>
+      `<span class="corr-event-badge" style="background:${ev.color||'#888'}">${ev.title} (${ev.start.slice(5)}〜${(ev.end||ev.start).slice(5)})</span>`
+    ).join('');
+  }
+
+  // chart-sales-vs-clicks（イベント重ね）
+  if (charts['chart-sales-vs-clicks']) charts['chart-sales-vs-clicks'].destroy();
+  {
+    const ctx2 = document.getElementById('chart-sales-vs-clicks')?.getContext('2d');
+    if (ctx2) {
+      charts['chart-sales-vs-clicks'] = new Chart(ctx2, {
+        type: 'bar',
+        data: { labels: chartLabels, datasets: [
+          { label:'売上(¥)', data: d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.6)', yAxisID:'y' },
+          { label:'広告クリック', type:'line', data: d.map(e=>e.clicks||null), borderColor:'#7986CB', backgroundColor:'rgba(121,134,203,0.08)', tension:0.3, yAxisID:'y1', pointRadius:3, fill:true },
+        ]},
+        options: { ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales,
+          y:  { grid:{color:'#F0F0F0'}, ticks:{font:{size:11}, callback:v=>'¥'+v.toLocaleString()} },
+          y1: { position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:11}}, title:{display:true,text:'クリック数',font:{size:10}} }
+        }},
+        plugins: [makeEventPlugin(d)]
+      });
+    }
+    renderEventLegend('legend-sales-vs-clicks', d);
+  }
+
+  // chart-roas（イベント重ね）
+  if (charts['chart-roas']) charts['chart-roas'].destroy();
+  {
+    const ctx3 = document.getElementById('chart-roas')?.getContext('2d');
+    if (ctx3) {
+      charts['chart-roas'] = new Chart(ctx3, {
+        type: 'line',
+        data: { labels: chartLabels, datasets: [
+          { label:'ROAS(%)', data: roasData, borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true, pointRadius:4 },
+          targetLine('目標1000%', 1000, '#FFB74D'),
+        ]},
+        options: { ...CHART_DEFAULTS },
+        plugins: [makeEventPlugin(d)]
+      });
+    }
+    renderEventLegend('legend-roas', d);
+  }
 
   // 散布図：IG流入 vs 売上
   const scatterData = d
@@ -1381,7 +1566,6 @@ function renderAll() {
   renderKPIs();
   renderCharts();
   renderHistory();
-  renderTopSummary();
 }
 
 // ─────────────────────────────────────────────
@@ -1480,129 +1664,6 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   event.currentTarget.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'ig') renderIgTab();
-}
-
-// ─────────────────────────────────────────────
-// 社長向けサマリー
-// ─────────────────────────────────────────────
-function renderTopSummary() {
-  if (!entries.length) return;
-  const today = new Date();
-  const ym = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-  const thisMonth = entries.filter(e => e.date?.startsWith(ym));
-  const prevYm = (() => { const d = new Date(today.getFullYear(), today.getMonth()-1, 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })();
-  const prevMonth = entries.filter(e => e.date?.startsWith(prevYm));
-
-  const sum = (arr, k) => arr.reduce((s, e) => s + (Number(e[k])||0), 0);
-  const tSales  = sum(thisMonth, 'sales');
-  const pSales  = sum(prevMonth, 'sales');
-  const tBudget = sum(thisMonth, 'budget');
-  const tIg     = sum(thisMonth, 'igVisitors');
-  const roas    = tBudget > 0 ? Math.round(tSales / tBudget * 100) : null;
-  const salesDiff = pSales > 0 ? Math.round((tSales - pSales) / pSales * 100) : null;
-
-  const label = document.getElementById('summary-period-label');
-  if (label) label.textContent = `${today.getMonth()+1}月のサマリー（${thisMonth.length}日分）`;
-
-  const fmt = (v, pfx='¥') => v != null ? pfx + Number(v).toLocaleString() : '—';
-  const diffBadge = salesDiff != null
-    ? `<span style="font-size:11px;font-weight:700;color:${salesDiff>=0?'#43A047':'#E53935'};margin-left:6px;">${salesDiff>=0?'▲':'▼'}${Math.abs(salesDiff)}%</span>`
-    : '';
-
-  const cards = [
-    { label:'今月の売上', value: fmt(tSales||null), sub: `前月比${diffBadge}` },
-    { label:'ROAS', value: roas ? roas.toLocaleString()+'%' : '—', sub:'売上÷広告費' },
-    { label:'IG→楽天 流入', value: tIg ? tIg.toLocaleString()+'人' : '—', sub:'目標 月500人↑' },
-    { label:'広告費（合計）', value: fmt(tBudget||null), sub:'' },
-  ];
-  const el = document.getElementById('summary-cards');
-  if (el) el.innerHTML = cards.map(c => `
-    <div style="background:#F7F7F5;border-radius:10px;padding:14px 16px;">
-      <div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px;">${c.label}</div>
-      <div style="font-size:22px;font-weight:700;line-height:1.2;">${c.value}${c.label==='今月の売上'?diffBadge:''}</div>
-      ${c.sub&&c.label!=='今月の売上' ? `<div style="font-size:11px;color:#aaa;margin-top:3px;">${c.sub}</div>` : ''}
-    </div>
-  `).join('');
-}
-
-// ─────────────────────────────────────────────
-// Instagramタブ（統合）
-// ─────────────────────────────────────────────
-function renderIgTab() {
-  const d = last10();
-  const l = getChartLabels(d);
-
-  // KPI
-  const P = getPeriodEntries();
-  const sum = k => P.reduce((s,e) => s+(Number(e[k])||0), 0);
-  const tIg = sum('igVisitors'), tBudget = sum('budget'), tClicks = sum('clicks');
-  const tImp = sum('adImp'), tSales = sum('sales');
-  const ctr = tImp>0 ? (tClicks/tImp*100) : null;
-  const cpc = tClicks>0 ? Math.round(tBudget/tClicks) : null;
-  const roas = tBudget>0&&tSales>0 ? Math.round(tSales/tBudget*100) : null;
-
-  const pEl = document.getElementById('kpi-ig-period');
-  const pAd = document.getElementById('kpi-ad-period');
-  if (pEl && pAd) pEl.textContent = pAd.textContent;
-
-  const igEl = document.getElementById('kpi-ig');
-  if (igEl) igEl.innerHTML = [
-    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null, null, 'InstagramからQRコードや広告経由で楽天ショップに来たアクセス人数。出所：楽天RMS手入力'),
-    kpiCard('CTR（平均）', ctr, 2, '%', '目標 1.5%↑', v=>v>=1.5?'ok':v>=1?'warn':'bad', null, 'クリック率。広告を見た人のうちクリックした割合。'),
-    kpiCard('CPC（平均）', cpc, 0, '¥', '目標 ¥30↓', v=>v<=30?'ok':v<=40?'warn':'bad', null, 'クリック単価。1クリックあたりの広告費。'),
-    kpiCard('ROAS', roas, 0, '%', '目標 1000%↑', v=>v>=1000?'ok':v>=500?'warn':'bad', null, '広告費対売上比率。広告1円あたり何円売れたか。'),
-    kpiCard('広告費（合計）', tBudget||null, 0, '¥', '', null, null, '期間中に使用したMeta広告費の合計。'),
-  ].join('');
-
-  // チャート
-  const makeIg = (id, type, datasets, extra={}) => {
-    if (charts[id]) charts[id].destroy();
-    const ctx = document.getElementById(id)?.getContext('2d');
-    if (!ctx) return;
-    charts[id] = new Chart(ctx, { type, data:{labels:l, datasets}, options:{...CHART_DEFAULTS,...extra} });
-  };
-
-  makeIg('chart-ig-visitors', 'bar', [
-    { label:'IG→楽天 流入', data:d.map(e=>e.igVisitors||null), backgroundColor:'rgba(233,30,99,0.7)' },
-  ]);
-  makeIg('chart-ig-ctr', 'line', [
-    { label:'CTR(%)', data:d.map(e=>e.ctr||null), borderColor:'#26A69A', backgroundColor:'rgba(38,166,154,0.08)', tension:0.3, fill:true },
-    targetLine('目標1.5%', 1.5, '#FFB74D'),
-  ]);
-  makeIg('chart-ig-cpc', 'line', [
-    { label:'CPC(¥)', data:d.map(e=>e.cpc||null), borderColor:'#EF5350', backgroundColor:'rgba(239,83,80,0.08)', tension:0.3, fill:true },
-    targetLine('目標¥30', 30, '#FFB74D'),
-  ]);
-  const roasData = d.map(e => {
-    const s=Number(e.sales)||0, b=Number(e.budget)||0;
-    return (s>0&&b>=100) ? Math.round(s/b*100) : null;
-  });
-  makeIg('chart-ig-roas', 'line', [
-    { label:'ROAS(%)', data:roasData, borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true, pointRadius:4 },
-    targetLine('目標1000%', 1000, '#FFB74D'),
-  ]);
-
-  // 散布図
-  const scatterData = d.filter(e=>(e.igVisitors||0)>0||(e.sales||0)>0)
-    .map(e=>({x:Number(e.igVisitors)||0, y:Number(e.sales)||0, label:e.date?.slice(5)}));
-  if (charts['chart-ig-scatter']) charts['chart-ig-scatter'].destroy();
-  const sCtx = document.getElementById('chart-ig-scatter')?.getContext('2d');
-  if (sCtx) {
-    charts['chart-ig-scatter'] = new Chart(sCtx, {
-      type:'scatter',
-      data:{datasets:[{label:'IG流入 vs 売上', data:scatterData, backgroundColor:'rgba(233,30,99,0.6)', pointRadius:6}]},
-      options:{...CHART_DEFAULTS,
-        scales:{
-          x:{title:{display:true,text:'IG流入（人）',font:{size:11}},grid:{color:'#F0F0F0'},ticks:{font:{size:11}}},
-          y:{title:{display:true,text:'売上（¥）',font:{size:11}},grid:{color:'#F0F0F0'},ticks:{font:{size:11},callback:v=>'¥'+v.toLocaleString()}}
-        },
-        plugins:{...CHART_DEFAULTS.plugins,
-          tooltip:{callbacks:{label:ctx=>`${ctx.raw.label} IG:${ctx.raw.x}人 売上:¥${ctx.raw.y.toLocaleString()}`}}
-        }
-      }
-    });
-  }
 }
 
 // ─────────────────────────────────────────────
