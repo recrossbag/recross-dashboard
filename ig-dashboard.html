@@ -272,6 +272,14 @@ body { font-family: 'Hiragino Sans','Helvetica Neue',sans-serif; background: #F7
         </div>
         <button class="btn btn-outline" style="margin-bottom:1px;" onclick="addSaleItem()">追加</button>
       </div>
+
+      <!-- セール告知投稿ショートカット -->
+      <div id="sale-announce-hint" style="display:none;margin-top:14px;padding:10px 12px;background:#F3E5F5;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-size:12px;color:#6A1B9A;">
+          📣 <strong>セール前の告知投稿</strong>もおすすめです。セール情報をインスタ投稿候補に追加できます。
+        </div>
+        <button class="btn btn-sm" style="background:#6A1B9A;color:#fff;border:none;white-space:nowrap;flex-shrink:0;" onclick="addSaleAnnouncement()">告知投稿を候補に追加</button>
+      </div>
     </div>
   </details>
 
@@ -780,8 +788,10 @@ function removeSaleItem(code) {
 function renderSaleItems() {
   const list = document.getElementById('sale-items-list');
   const count = document.getElementById('sale-item-count');
+  const hint = document.getElementById('sale-announce-hint');
   if (!list) return;
-  count.textContent = saleItems.length ? `${saleItems.length}件除外中` : '';
+  count.textContent = saleItems.length ? `${saleItems.length}件登録中` : '';
+  if (hint) hint.style.display = saleItems.length ? 'flex' : 'none';
   if (!saleItems.length) {
     list.innerHTML = '<span style="font-size:12px;color:#aaa;">まだ登録されていません</span>';
     return;
@@ -961,18 +971,24 @@ function cvrCard(code, b, c, diff, type, saleReason) {
   const icon = type==='opportunity'?'💡':type==='strong'?'✅':type==='excluded'?'🚫':'⚠️';
 
   if (type === 'excluded') {
-    return `<div class="candidate-card" style="opacity:0.6;background:#F5F5F5;border-left:3px solid #BDBDBD;">
+    const safeCode = escHtml(code);
+    const safeName = escHtml(b.name);
+    const safeCvr  = b.cvr.toFixed(2);
+    const safeReason = escHtml(saleReason||'除外設定あり');
+    return `<div class="candidate-card" style="background:#FAFAFA;border-left:3px solid #BDBDBD;">
       <div style="flex-shrink:0;padding-top:2px;">${icon}</div>
       <div class="candidate-body">
-        <div class="candidate-name" style="color:#888;">${escHtml(code)}</div>
-        <div style="font-size:12px;color:#888;margin-bottom:4px;">${escHtml(b.name)}</div>
+        <div class="candidate-name" style="color:#888;">${safeCode}</div>
+        <div style="font-size:12px;color:#888;margin-bottom:4px;">${safeName}</div>
         <div class="candidate-meta">
-          <span>CVR <strong style="color:#888;">${b.cvr.toFixed(2)}%</strong></span>
+          <span>CVR <strong style="color:#888;">${safeCvr}%</strong></span>
           <span>アクセス <strong style="color:#888;">${b.access.toLocaleString()}人</strong></span>
-          <span style="background:#FFEBEE;color:#C62828;padding:2px 7px;border-radius:4px;font-size:11px;">⚠️ ${escHtml(saleReason||'除外設定あり')}</span>
+          <span style="background:#FFEBEE;color:#C62828;padding:2px 7px;border-radius:4px;font-size:11px;">⚠️ ${safeReason}</span>
         </div>
+        <div style="margin-top:6px;font-size:11px;color:#9E9E9E;">💡 「じつはこんな商品も」切り口なら投稿◎</div>
       </div>
-      <span style="font-size:11px;color:#BDBDBD;white-space:nowrap;">候補から除外</span>
+      <button class="btn btn-sm" style="background:#EDE7F6;color:#5E35B1;border:none;white-space:nowrap;flex-shrink:0;"
+        onclick="addFromCvrAlt('${safeCode}','${safeName}','${safeCvr}%',${b.access},'${safeReason}')">別切り口で追加</button>
     </div>`;
   }
 
@@ -1005,6 +1021,36 @@ function addFromCvr(code, name, cvr, access) {
   });
   save();
   alert(`「${code}」を投稿候補リストに追加しました`);
+}
+
+function addFromCvrAlt(code, name, cvr, access, saleReason) {
+  if (candidates.find(c => c.id === code + '_alt')) {
+    alert('すでに候補リストに追加済みです'); return;
+  }
+  candidates.unshift({
+    id: code + '_alt',
+    name: `${code} ${name}`,
+    cvr, access, status: 'candidate', source: 'csv', type: 'product',
+    reason: `【別切り口】セール中（${saleReason}）だが「じつはこんな商品も」の切り口で紹介可能 / CVR ${cvr}`,
+    note: '通常価格での商品魅力を伝える方向で制作',
+  });
+  save();
+  alert(`「${code}」を別切り口の投稿候補に追加しました`);
+}
+
+function addSaleAnnouncement() {
+  if (!saleItems.length) { alert('セール商品が登録されていません'); return; }
+  const id = 'sale-announce-' + Date.now();
+  const names = saleItems.map(s => s.code + (s.reason ? `（${s.reason}）` : '')).join('、');
+  candidates.unshift({
+    id,
+    name: '🏷️ セール告知投稿',
+    status: 'candidate', source: 'manual', type: 'sale',
+    reason: `セール中商品: ${names}`,
+    note: 'セール開始前に投稿。割引率・期間・対象商品を明記',
+  });
+  save();
+  alert('セール告知投稿を候補リストに追加しました');
 }
 </script>
 </body>
