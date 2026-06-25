@@ -560,7 +560,7 @@ function roboTalk() {
     <h2>📅 アクセス・流入まとめ入力</h2>
     <p style="font-size:11px;color:#888;margin-bottom:4px;">楽天RMS「参照元・検索キーワード分析」→ エリアを切り替えて確認</p>
     <div style="font-size:10px;color:#aaa;margin-bottom:10px;line-height:1.6;">
-      楽天外：エリア「楽天市場外」のみON ／ 楽天内：エリア「楽天市場内」のみON ／ IG・サーチ：参照元テーブルの数字
+      楽天外：エリア「楽天市場外」のみON ／ 楽天内：エリア「楽天市場内（店舗外）」のみON ／ IG・サーチ：参照元テーブルの数字
     </div>
     <div style="display:grid;grid-template-columns:64px 1fr 1fr 1fr 1fr;gap:4px;margin-bottom:6px;font-size:10px;font-weight:700;color:#888;text-align:center;">
       <div style="text-align:left;">日付</div>
@@ -805,29 +805,51 @@ function init() {
 function renderEvents() {
   const list = document.getElementById('event-list');
   const today = new Date(); today.setHours(0,0,0,0);
-  // 今日以降のみ表示
-  const sorted = [...events]
-    .filter(ev => { const d = new Date(ev.date); d.setHours(0,0,0,0); return d >= today; })
-    .sort((a,b) => a.date.localeCompare(b.date));
+  const in3 = new Date(today); in3.setDate(in3.getDate() + 3);
+
+  // カレンダーイベントから「開始3日前〜開始当日」または「終了3日前〜終了当日（進行中）」のものを抽出
+  const items = (calEventsCache || []).map(ev => {
+    const start = new Date(ev.start + 'T00:00:00'); start.setHours(0,0,0,0);
+    const end   = new Date((ev.end || ev.start) + 'T00:00:00'); end.setHours(0,0,0,0);
+    const diffStart = Math.floor((start - today) / 86400000); // 開始まで何日
+    const diffEnd   = Math.floor((end   - today) / 86400000); // 終了まで何日
+
+    // 開始3日前〜開始当日（まだ始まっていない）
+    if (diffStart >= 0 && diffStart <= 3) {
+      return { ev, type: 'start', diff: diffStart, sortKey: ev.start };
+    }
+    // 進行中 かつ 終了まで3日以内
+    if (diffStart < 0 && diffEnd >= 0 && diffEnd <= 3) {
+      return { ev, type: 'end', diff: diffEnd, sortKey: ev.end || ev.start };
+    }
+    return null;
+  }).filter(Boolean).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
   list.innerHTML = '';
-  if (sorted.length === 0) {
-    list.innerHTML = '<div class="empty">今後の予定はありません</div>';
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty">直近3日以内に開始・終了するイベントはありません</div>';
     return;
   }
-  sorted.forEach(ev => {
-    const evDate = new Date(ev.date); evDate.setHours(0,0,0,0);
-    const diff = Math.floor((evDate - today) / 86400000);
+
+  const CAT_ICON = { rakuten:'🛒', coupon:'🎫', point:'⭐', ad:'📣' };
+
+  items.forEach(({ ev, type, diff }) => {
     let badge = '';
-    if (diff === 0) badge = '<span class="badge today">本日</span>';
-    else if (diff <= 3) badge = `<span class="badge soon">あと${diff}日</span>`;
+    if (type === 'start') {
+      if (diff === 0) badge = '<span class="badge today">本日開始</span>';
+      else badge = `<span class="badge soon">開始まであと${diff}日</span>`;
+    } else {
+      if (diff === 0) badge = '<span class="badge today">本日終了</span>';
+      else badge = `<span class="badge soon">終了まであと${diff}日</span>`;
+    }
+    const icon = CAT_ICON[ev.cat] || '📅';
+    const dateLabel = type === 'start' ? ev.start : (ev.end || ev.start);
 
     const div = document.createElement('div');
     div.className = 'event-item';
     div.innerHTML = `
-      <div class="event-date">${ev.date}</div>
-      <div class="event-name">${ev.name}${badge}</div>
-      <button class="event-del" onclick="deleteEvent('${ev.id}')">×</button>
+      <div class="event-date">${dateLabel}</div>
+      <div class="event-name">${icon} ${ev.title}${badge}</div>
     `;
     list.appendChild(div);
   });
