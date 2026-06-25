@@ -136,6 +136,7 @@ body { font-family: 'Hiragino Sans','Helvetica Neue',sans-serif; background: #F7
 <div class="tabs">
   <div class="tab active" onclick="switchTab('posts', this)">📝 投稿候補リスト</div>
   <div class="tab" onclick="switchTab('brief', this)">📋 広告ブリーフ</div>
+  <div class="tab" onclick="switchTab('cvr', this)">📊 商品CVR分析</div>
 </div>
 
 <!-- ===== 投稿候補タブ ===== -->
@@ -216,6 +217,77 @@ body { font-family: 'Hiragino Sans','Helvetica Neue',sans-serif; background: #F7
 
   <div class="brief-list" id="brief-list">
     <div class="empty-state"><div class="icon">📋</div>まだブリーフがありません<br><small>「新規ブリーフ作成」から追加してください</small></div>
+  </div>
+</div>
+
+<!-- ===== 商品CVR分析タブ ===== -->
+<div class="tab-content" id="tab-cvr">
+
+  <div class="section-header" style="margin-top:4px;">
+    <div>
+      <div class="section-title">📊 商品CVR分析</div>
+      <div class="section-desc">通常期間と比較期間のCSVを読み込んで、セール効果を除いた実力を可視化します</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+    <div style="background:#fff;border:1px solid #E8E8E8;border-radius:12px;padding:16px;">
+      <div style="font-size:12px;font-weight:700;color:#888;margin-bottom:8px;">📅 通常期間CSV（ベースライン）</div>
+      <div style="font-size:12px;color:#555;margin-bottom:10px;">セールのない月・期間のCSVを使うと精度が上がります</div>
+      <input type="file" id="base-csv-input" accept=".csv" style="display:none" onchange="loadBaseCsv(this)">
+      <button class="btn btn-outline" onclick="document.getElementById('base-csv-input').click()">📂 CSVを選択</button>
+      <div id="base-csv-label" style="margin-top:8px;font-size:12px;color:#888;">未選択</div>
+    </div>
+    <div style="background:#fff;border:1px solid #E8E8E8;border-radius:12px;padding:16px;">
+      <div style="font-size:12px;font-weight:700;color:#888;margin-bottom:8px;">📅 比較期間CSV（任意）</div>
+      <div style="font-size:12px;color:#555;margin-bottom:10px;">セール期間など別の月を入れると差分で効果がわかります</div>
+      <input type="file" id="comp-csv-input" accept=".csv" style="display:none" onchange="loadCompCsv(this)">
+      <button class="btn btn-outline" onclick="document.getElementById('comp-csv-input').click()">📂 CSVを選択</button>
+      <div id="comp-csv-label" style="margin-top:8px;font-size:12px;color:#888;">未選択（1本だけでも分析できます）</div>
+    </div>
+  </div>
+
+  <div id="cvr-result" style="display:none;">
+
+    <!-- 🏆 インスタ最優先候補 -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:800;color:#E64A19;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+        💡 インスタで押すべき商品 <span style="font-size:11px;font-weight:400;color:#888;">通常時CVR高 × アクセス少 → 流入を増やすだけで売上が伸びやすい</span>
+      </div>
+      <div id="cvr-opportunity" class="candidates-grid"></div>
+    </div>
+
+    <!-- ✅ 実力あり -->
+    <div id="cvr-strong-wrap" style="margin-bottom:20px;display:none;">
+      <div style="font-size:13px;font-weight:800;color:#2E7D32;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+        ✅ 両期間ともCVR高 <span style="font-size:11px;font-weight:400;color:#888;">セール関係なく買われる商品</span>
+      </div>
+      <div id="cvr-strong" class="candidates-grid"></div>
+    </div>
+
+    <!-- ⚠️ セール効果大 -->
+    <div id="cvr-sale-wrap" style="margin-bottom:20px;display:none;">
+      <div style="font-size:13px;font-weight:800;color:#E65100;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+        ⚠️ セール効果が大きい商品 <span style="font-size:11px;font-weight:400;color:#888;">通常時は低CVR → 定価では売れにくい可能性あり</span>
+      </div>
+      <div id="cvr-sale" class="candidates-grid"></div>
+    </div>
+
+    <!-- 全商品テーブル -->
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#888;padding:8px 0;">▶ 全商品CVR一覧を見る</summary>
+      <div style="overflow-x:auto;margin-top:8px;">
+        <table id="cvr-table" style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #E8E8E8;border-radius:10px;overflow:hidden;">
+          <thead id="cvr-table-head"></thead>
+          <tbody id="cvr-table-body"></tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+
+  <div id="cvr-empty" style="text-align:center;padding:40px;color:#aaa;">
+    <div style="font-size:36px;margin-bottom:12px;">📂</div>
+    通常期間のCSVを選択すると分析が始まります
   </div>
 </div>
 
@@ -651,6 +723,171 @@ function deleteBrief(i) {
   const stored = [...briefs].reverse();
   stored.splice(briefs.length - 1 - i, 1);
   IG_DOC.set({ briefs: stored }, { merge: true });
+}
+
+// ─── 商品CVR分析 ──────────────────────────────
+let baseData = null; // { code: {name, cvr, access, sales} }
+let compData = null;
+
+function parseItemCsvText(text) {
+  const lines = text.split('\n');
+  const hi = lines.findIndex(l => l.replace(/^﻿/,'').startsWith('#,'));
+  if (hi < 0) return null;
+  const headers = lines[hi].replace(/^﻿/,'').split(',');
+  const col = n => headers.findIndex(h => h.trim() === n);
+  const iCode = col('商品番号'), iName = col('商品名'), iCvr = col('転換率');
+  const iAcc = col('アクセス人数'), iSales = col('売上'), iOrders = col('売上件数');
+  const result = {};
+  for (let i = hi + 1; i < lines.length; i++) {
+    const row = parseCSVLine(lines[i]);
+    if (!row || row.length < 5) continue;
+    const code = (row[iCode]||'').trim();
+    if (!code) continue;
+    result[code] = {
+      name:   (row[iName]||'').trim().replace(/^\\.*?\//, '').trim().slice(0, 50),
+      cvr:    parseFloat((row[iCvr]||'').replace('%','')) || 0,
+      access: parseInt((row[iAcc]||'').replace(/,/g,'')) || 0,
+      sales:  parseInt((row[iSales]||'').replace(/,/g,'')) || 0,
+      orders: parseInt((row[iOrders]||'').replace(/,/g,'')) || 0,
+    };
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+function loadBaseCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    baseData = parseItemCsvText(e.target.result);
+    document.getElementById('base-csv-label').textContent = baseData
+      ? `✅ ${file.name}（${Object.keys(baseData).length}商品）`
+      : '❌ 読み込み失敗';
+    if (baseData) renderCvrAnalysis();
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function loadCompCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    compData = parseItemCsvText(e.target.result);
+    document.getElementById('comp-csv-label').textContent = compData
+      ? `✅ ${file.name}（${Object.keys(compData).length}商品）`
+      : '❌ 読み込み失敗';
+    if (baseData) renderCvrAnalysis();
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function renderCvrAnalysis() {
+  document.getElementById('cvr-empty').style.display = 'none';
+  document.getElementById('cvr-result').style.display = 'block';
+
+  const hasBoth = baseData && compData;
+  const codes = Object.keys(baseData);
+
+  // カテゴリ分類
+  const opportunity = []; // 通常時CVR高 × アクセス少
+  const strong      = []; // 両月ともCVR高（比較あり時のみ）
+  const saleBoost   = []; // 比較時CVR大幅UP（セール効果大）
+
+  codes.forEach(code => {
+    const b = baseData[code];
+    const c = compData ? compData[code] : null;
+    const diff = c ? c.cvr - b.cvr : null;
+
+    // インスタ機会：通常時CVR ≥ 1.5% & アクセス < 600
+    if (b.cvr >= 1.5 && b.access < 600) opportunity.push({ code, b, c, diff });
+    // 両月高：比較時もCVR ≥ 2%
+    if (hasBoth && c && b.cvr >= 2.0 && c.cvr >= 2.0) strong.push({ code, b, c, diff });
+    // セール効果：比較時に+2pt以上かつ通常時低
+    if (hasBoth && c && diff !== null && diff >= 2.0 && b.cvr < 2.0 && b.access >= 50)
+      saleBoost.push({ code, b, c, diff });
+  });
+
+  opportunity.sort((a,b) => b.b.cvr - a.b.cvr);
+  strong.sort((a,b) => b.b.cvr - a.b.cvr);
+  saleBoost.sort((a,b) => b.diff - a.diff);
+
+  // 機会カード
+  document.getElementById('cvr-opportunity').innerHTML = opportunity.length
+    ? opportunity.map(({code, b, c, diff}) => cvrCard(code, b, c, diff, 'opportunity')).join('')
+    : '<div style="color:#aaa;font-size:13px;padding:12px;">該当商品なし（CVR1.5%以上＆アクセス600人未満）</div>';
+
+  // 両月高カード
+  if (hasBoth) {
+    document.getElementById('cvr-strong-wrap').style.display = strong.length ? 'block' : 'none';
+    document.getElementById('cvr-strong').innerHTML = strong.map(({code,b,c,diff}) => cvrCard(code,b,c,diff,'strong')).join('');
+    document.getElementById('cvr-sale-wrap').style.display = saleBoost.length ? 'block' : 'none';
+    document.getElementById('cvr-sale').innerHTML = saleBoost.map(({code,b,c,diff}) => cvrCard(code,b,c,diff,'sale')).join('');
+  }
+
+  // 全商品テーブル
+  const thead = document.getElementById('cvr-table-head');
+  const tbody = document.getElementById('cvr-table-body');
+  thead.innerHTML = `<tr style="background:#F5F5F5;">
+    <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #E8E8E8;">商品番号</th>
+    <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #E8E8E8;">商品名</th>
+    <th style="padding:8px 10px;text-align:right;border-bottom:1px solid #E8E8E8;">通常CVR</th>
+    <th style="padding:8px 10px;text-align:right;border-bottom:1px solid #E8E8E8;">通常アクセス</th>
+    ${hasBoth ? '<th style="padding:8px 10px;text-align:right;border-bottom:1px solid #E8E8E8;">比較CVR</th><th style="padding:8px 10px;text-align:right;border-bottom:1px solid #E8E8E8;">差</th>' : ''}
+    <th style="padding:8px 10px;text-align:right;border-bottom:1px solid #E8E8E8;">売上</th>
+  </tr>`;
+  const allRows = codes.map(code => ({code, b: baseData[code], c: compData?.[code]}));
+  allRows.sort((a,b) => b.b.cvr - a.b.cvr);
+  tbody.innerHTML = allRows.map(({code, b, c}) => {
+    const diff = c ? c.cvr - b.cvr : null;
+    const diffStr = diff !== null ? `<span style="color:${diff>0?'#E53935':diff<0?'#43A047':'#888'}">${diff>0?'+':''}${diff.toFixed(2)}pt</span>` : '';
+    return `<tr style="border-bottom:1px solid #F5F5F5;">
+      <td style="padding:7px 10px;font-weight:700;">${escHtml(code)}</td>
+      <td style="padding:7px 10px;color:#555;font-size:11px;">${escHtml(b.name)}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:700;">${b.cvr.toFixed(2)}%</td>
+      <td style="padding:7px 10px;text-align:right;">${b.access.toLocaleString()}人</td>
+      ${hasBoth ? `<td style="padding:7px 10px;text-align:right;">${c ? c.cvr.toFixed(2)+'%' : '—'}</td><td style="padding:7px 10px;text-align:right;">${diffStr||'—'}</td>` : ''}
+      <td style="padding:7px 10px;text-align:right;">¥${b.sales.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+function cvrCard(code, b, c, diff, type) {
+  const diffBadge = diff !== null
+    ? `<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:${diff>0?'#FFEBEE':'#E8F5E9'};color:${diff>0?'#C62828':'#2E7D32'}">比較期間 ${diff>0?'+':''}${diff.toFixed(1)}pt → ${c.cvr.toFixed(2)}%</span>`
+    : '';
+  const icon = type==='opportunity'?'💡':type==='strong'?'✅':'⚠️';
+  return `<div class="candidate-card">
+    <div style="flex-shrink:0;padding-top:2px;">${icon}</div>
+    <div class="candidate-body">
+      <div class="candidate-name">${escHtml(code)}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:4px;">${escHtml(b.name)}</div>
+      <div class="candidate-meta">
+        <span>通常CVR <strong style="color:#E64A19;">${b.cvr.toFixed(2)}%</strong></span>
+        <span>アクセス <strong>${b.access.toLocaleString()}人</strong></span>
+        <span>売上 <strong>¥${b.sales.toLocaleString()}</strong></span>
+        ${diffBadge}
+      </div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="addFromCvr('${escHtml(code)}','${escHtml(b.name)}','${b.cvr.toFixed(2)}%',${b.access})">候補に追加</button>
+  </div>`;
+}
+
+function addFromCvr(code, name, cvr, access) {
+  if (candidates.find(c => c.id === code)) {
+    alert('すでに候補リストに追加済みです'); return;
+  }
+  candidates.unshift({
+    id: code,
+    name: `${code} ${name}`,
+    cvr, access, status: 'candidate', source: 'csv', type: 'product',
+    reason: `通常期間CVR ${cvr}・アクセス${access.toLocaleString()}人 → インスタで押すと伸びやすい`,
+    note: '',
+  });
+  save();
+  alert(`「${code}」を投稿候補リストに追加しました`);
 }
 </script>
 </body>
