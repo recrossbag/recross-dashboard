@@ -233,21 +233,26 @@
     .gantt-group-fill { flex:1; background:#F5F5F5; }
 
     /* ── 相関分析：総合判定カード ── */
-    #corr-verdict { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
-    .verdict-card { background:#fff; border:2px solid #E0E0E0; border-radius:12px; padding:14px 16px; min-width:140px; flex:1; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
-    .verdict-card.good { border-color:#66BB6A; background:#F1F8E9; }
-    .verdict-card.warn { border-color:#FFA726; background:#FFF8E1; }
-    .verdict-card.bad  { border-color:#EF5350; background:#FFEBEE; }
-    .verdict-card.na   { border-color:#BDBDBD; background:#FAFAFA; }
-    .verdict-emoji  { font-size:26px; margin-bottom:4px; }
-    .verdict-label  { font-size:11px; color:#666; margin-bottom:6px; line-height:1.3; }
-    .verdict-val    { font-size:20px; font-weight:700; color:#212121; }
-    .verdict-status { font-size:12px; font-weight:700; margin-top:4px; }
+    #corr-verdict { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    .verdict-card { background:#fff; border:1px solid #E8E8E8; border-radius:10px; padding:10px 14px; flex:1; min-width:120px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+    .verdict-card.good { border-color:#A5D6A7; background:#F9FBF9; }
+    .verdict-card.warn { border-color:#FFCC80; background:#FFFDF5; }
+    .verdict-card.bad  { border-color:#EF9A9A; background:#FFF5F5; }
+    .verdict-card.na   { border-color:#E0E0E0; background:#FAFAFA; }
+    .verdict-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .verdict-card.good .verdict-dot { background:#43A047; }
+    .verdict-card.warn .verdict-dot { background:#FB8C00; }
+    .verdict-card.bad  .verdict-dot { background:#E53935; }
+    .verdict-card.na   .verdict-dot { background:#BDBDBD; }
+    .verdict-body { display:flex; flex-direction:column; gap:1px; min-width:0; }
+    .verdict-label  { font-size:11px; color:#888; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .verdict-val    { font-size:16px; font-weight:700; color:#212121; line-height:1.2; }
+    .verdict-status { font-size:11px; font-weight:700; }
     .verdict-card.good .verdict-status { color:#388E3C; }
     .verdict-card.warn .verdict-status { color:#E65100; }
     .verdict-card.bad  .verdict-status { color:#C62828; }
-    .verdict-card.na   .verdict-status { color:#757575; }
-    .verdict-hint   { font-size:10px; color:#9E9E9E; margin-top:2px; }
+    .verdict-card.na   .verdict-status { color:#9E9E9E; }
+    .verdict-hint   { font-size:10px; color:#BDBDBD; }
 
     /* ── 相関分析：次にすべきこと ── */
     .corr-actions-box { background:#fff; border:1px solid #E0E0E0; border-radius:10px; padding:14px 16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
@@ -1106,29 +1111,19 @@ function renderCorrelationSummary(roas, ctr, tIg, tBudget) {
   const ctrJ  = judge(ctr,   settings.targetCtr,  settings.targetCtr*0.67);
   const igJ   = judge(tIg > 0 ? tIg : null, settings.targetIg, settings.targetIg*0.4);
 
-  verdictEl.innerHTML = `
-    <div class="verdict-card ${roasJ.cls}">
-      <div class="verdict-emoji">${roasJ.emoji}</div>
-      <div class="verdict-label">広告の費用対効果<br>（ROAS）</div>
-      <div class="verdict-val">${roas != null ? roas.toLocaleString() + '%' : '—'}</div>
-      <div class="verdict-status">${roasJ.text}</div>
-      <div class="verdict-hint">目標 ${settings.targetRoas.toLocaleString()}%以上</div>
-    </div>
-    <div class="verdict-card ${ctrJ.cls}">
-      <div class="verdict-emoji">${ctrJ.emoji}</div>
-      <div class="verdict-label">広告クリック率<br>（CTR）</div>
-      <div class="verdict-val">${ctr != null ? ctr.toFixed(2) + '%' : '—'}</div>
-      <div class="verdict-status">${ctrJ.text}</div>
-      <div class="verdict-hint">目標 ${settings.targetCtr}%以上</div>
-    </div>
-    <div class="verdict-card ${igJ.cls}">
-      <div class="verdict-emoji">${igJ.emoji}</div>
-      <div class="verdict-label">IG→楽天<br>流入人数</div>
-      <div class="verdict-val">${(tIg > 0) ? tIg.toLocaleString() + '人' : '—'}</div>
-      <div class="verdict-status">${igJ.text}</div>
-      <div class="verdict-hint">月間目標 ${settings.targetIg.toLocaleString()}人以上</div>
-    </div>
-  `;
+  const vCard = (cls, label, val, status, hint) => `
+    <div class="verdict-card ${cls}">
+      <div class="verdict-dot"></div>
+      <div class="verdict-body">
+        <div class="verdict-label">${label}</div>
+        <div class="verdict-val">${val}</div>
+        <div class="verdict-status">${status}<span class="verdict-hint" style="margin-left:6px;">${hint}</span></div>
+      </div>
+    </div>`;
+  verdictEl.innerHTML =
+    vCard(roasJ.cls, '広告ROAS（総合）', roas != null ? roas.toLocaleString()+'%' : '—', roasJ.text, `目標${settings.targetRoas.toLocaleString()}%`) +
+    vCard(ctrJ.cls,  'CTR（Meta広告）',  ctr  != null ? ctr.toFixed(2)+'%'          : '—', ctrJ.text,  `目標${settings.targetCtr}%`) +
+    vCard(igJ.cls,   'IG→楽天 流入',     tIg  >  0    ? tIg.toLocaleString()+'人'   : '—', igJ.text,   `目標${settings.targetIg.toLocaleString()}人/月`);
 
   // ── ② 次にすべきこと ──
   const actions = [];
