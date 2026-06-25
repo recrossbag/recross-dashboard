@@ -1510,7 +1510,7 @@ function parseRakutenCSV(text) {
   if (lines.length < 2) return result;
 
   // 区切り文字を自動判定（タブ or カンマ）
-  const sep = lines[0].includes('\t') ? '\t' : ',';
+  const sep = lines.some(l => l.includes('\t')) ? '\t' : ',';
 
   // ヘッダー行からカラムインデックスを取得
   function splitLine(line) {
@@ -1526,14 +1526,25 @@ function parseRakutenCSV(text) {
     return fields;
   }
 
-  const header = splitLine(lines[0]);
+  // 楽天RMS CSVは先頭に免責事項・メタデータ行があるため、
+  // 「日付」と「売上金額」を両方含む行を実際のヘッダー行として探す
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    if (lines[i].includes('日付') && lines[i].includes('売上金額')) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx < 0) return result;
+
+  const header = splitLine(lines[headerIdx]);
   const colDate    = header.findIndex(h => h.includes('日付'));
   const colDevice  = header.findIndex(h => h.includes('デバイス'));
   const colSales   = header.findIndex(h => h === '売上金額');
   const colOrders  = header.findIndex(h => h === '売上件数');
   const colVisitors= header.findIndex(h => h === 'アクセス人数');
 
-  for (const line of lines.slice(1)) {
+  for (const line of lines.slice(headerIdx + 1)) {
     if (!line.trim()) continue;
     const fields = splitLine(line);
     const dateStr = (fields[colDate] ?? '').replace(/\//g,'-').replace(/"/g,'');
@@ -2063,8 +2074,9 @@ function importCSV(input) {
       rows.forEach(row => {
         const idx = entries.findIndex(en => en.date === row.date);
         if (idx >= 0) {
-          // 広告データだけ上書き
-          Object.assign(entries[idx], row);
+          // 広告データだけ上書き（IG流入・売上・アクセスは保持）
+          const adFields = { ctr: row.ctr, cpc: row.cpc, clicks: row.clicks, adImp: row.adImp, budget: row.budget, freq: row.freq };
+          Object.assign(entries[idx], adFields);
           skipped++;
         } else {
           entries.push(row);
