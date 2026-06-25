@@ -247,6 +247,34 @@ body { font-family: 'Hiragino Sans','Helvetica Neue',sans-serif; background: #F7
     </div>
   </div>
 
+  <!-- セール商品登録 -->
+  <details id="sale-items-panel" style="background:#fff;border:1px solid #E8E8E8;border-radius:12px;margin-bottom:16px;overflow:hidden;">
+    <summary style="padding:14px 16px;cursor:pointer;font-size:13px;font-weight:700;list-style:none;display:flex;align-items:center;gap:8px;">
+      <span>🏷️ セール・除外商品を登録</span>
+      <span id="sale-item-count" style="background:#FFF3E0;color:#E65100;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;"></span>
+      <span style="margin-left:auto;color:#aaa;font-size:11px;">登録した商品はインスタ候補から除外されます ▼</span>
+    </summary>
+    <div style="padding:0 16px 16px;">
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">例：半額セール中だった商品・ブランド方針と合わない商品など</div>
+
+      <!-- 登録済み一覧 -->
+      <div id="sale-items-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+
+      <!-- 追加フォーム -->
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group">
+          <label>商品番号</label>
+          <input type="text" id="sale-code-input" placeholder="JE-324A" style="width:120px;" />
+        </div>
+        <div class="form-group" style="flex:1;min-width:160px;">
+          <label>理由・メモ</label>
+          <input type="text" id="sale-reason-input" placeholder="半額セール中 / ネオプレン以外" />
+        </div>
+        <button class="btn btn-outline" style="margin-bottom:1px;" onclick="addSaleItem()">追加</button>
+      </div>
+    </div>
+  </details>
+
   <div id="cvr-result" style="display:none;">
 
     <!-- 🏆 インスタ最優先候補 -->
@@ -400,14 +428,18 @@ const IG_DOC = db.collection('dashboard').doc('ig');
 let candidates = [];
 let briefs     = [];
 let currentFilter = 'all';
+let saleItems  = []; // [{code, reason}] - セール中・除外商品
 
-// ─── Firestore sync ─────────────────────────
+// ─── Firestore sync (single listener) ───────
 IG_DOC.onSnapshot(snap => {
   const data = snap.data() || {};
   candidates = data.candidates || [];
   briefs     = (data.briefs || []).slice().reverse(); // 新しい順
+  saleItems  = data.saleItems || [];
   renderCandidates();
   renderBriefs();
+  renderSaleItems();
+  if (baseData) renderCvrAnalysis();
 });
 
 function save() {
@@ -729,6 +761,40 @@ function deleteBrief(i) {
 let baseData = null; // { code: {name, cvr, access, sales} }
 let compData = null;
 
+function addSaleItem() {
+  const code   = document.getElementById('sale-code-input').value.trim().toUpperCase();
+  const reason = document.getElementById('sale-reason-input').value.trim();
+  if (!code) { alert('商品番号を入力してください'); return; }
+  if (saleItems.find(s => s.code === code)) { alert('すでに登録済みです'); return; }
+  saleItems.push({ code, reason });
+  IG_DOC.set({ saleItems }, { merge: true });
+  document.getElementById('sale-code-input').value  = '';
+  document.getElementById('sale-reason-input').value = '';
+}
+
+function removeSaleItem(code) {
+  saleItems = saleItems.filter(s => s.code !== code);
+  IG_DOC.set({ saleItems }, { merge: true });
+}
+
+function renderSaleItems() {
+  const list = document.getElementById('sale-items-list');
+  const count = document.getElementById('sale-item-count');
+  if (!list) return;
+  count.textContent = saleItems.length ? `${saleItems.length}件除外中` : '';
+  if (!saleItems.length) {
+    list.innerHTML = '<span style="font-size:12px;color:#aaa;">まだ登録されていません</span>';
+    return;
+  }
+  list.innerHTML = saleItems.map(s => `
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#FFF3E0;border:1px solid #FFE0B2;border-radius:20px;padding:4px 10px;font-size:12px;">
+      <span style="font-weight:700;color:#E65100;">${escHtml(s.code)}</span>
+      ${s.reason ? `<span style="color:#888;">${escHtml(s.reason)}</span>` : ''}
+      <span style="cursor:pointer;color:#ccc;font-size:14px;line-height:1;" onclick="removeSaleItem('${escHtml(s.code)}')">×</span>
+    </div>
+  `).join('');
+}
+
 function parseItemCsvText(text) {
   const lines = text.split('\n');
   const hi = lines.findIndex(l => l.replace(/^﻿/,'').startsWith('#,'));
@@ -791,8 +857,12 @@ function renderCvrAnalysis() {
   const hasBoth = baseData && compData;
   const codes = Object.keys(baseData);
 
+  // セール・除外商品のコードセット
+  const saleSet = new Map(saleItems.map(s => [s.code.toUpperCase(), s.reason]));
+
   // カテゴリ分類
-  const opportunity = []; // 通常時CVR高 × アクセス少
+  const opportunity = []; // 通常時CVR高 × アクセス少（セール除外済み）
+  const excluded    = []; // セール・除外商品でCVRが高かったもの
   const strong      = []; // 両月ともCVR高（比較あり時のみ）
   const saleBoost   = []; // 比較時CVR大幅UP（セール効果大）
 
@@ -800,29 +870,57 @@ function renderCvrAnalysis() {
     const b = baseData[code];
     const c = compData ? compData[code] : null;
     const diff = c ? c.cvr - b.cvr : null;
+    const isSale = saleSet.has(code.toUpperCase());
+    const saleReason = saleSet.get(code.toUpperCase()) || 'セール・除外';
 
-    // インスタ機会：通常時CVR ≥ 1.5% & アクセス < 600
-    if (b.cvr >= 1.5 && b.access < 600) opportunity.push({ code, b, c, diff });
-    // 両月高：比較時もCVR ≥ 2%
-    if (hasBoth && c && b.cvr >= 2.0 && c.cvr >= 2.0) strong.push({ code, b, c, diff });
+    if (isSale) {
+      // セール商品：CVR高くても候補から除外して別表示
+      if (b.cvr >= 1.5 && b.access < 600) excluded.push({ code, b, c, diff, saleReason });
+    } else {
+      // インスタ機会：通常時CVR ≥ 1.5% & アクセス < 600
+      if (b.cvr >= 1.5 && b.access < 600) opportunity.push({ code, b, c, diff });
+    }
+    // 両月高：比較時もCVR ≥ 2%（セール商品も含めて表示、バッジで区別）
+    if (hasBoth && c && b.cvr >= 2.0 && c.cvr >= 2.0) strong.push({ code, b, c, diff, isSale, saleReason: saleSet.get(code.toUpperCase()) });
     // セール効果：比較時に+2pt以上かつ通常時低
     if (hasBoth && c && diff !== null && diff >= 2.0 && b.cvr < 2.0 && b.access >= 50)
       saleBoost.push({ code, b, c, diff });
   });
 
   opportunity.sort((a,b) => b.b.cvr - a.b.cvr);
+  excluded.sort((a,b) => b.b.cvr - a.b.cvr);
   strong.sort((a,b) => b.b.cvr - a.b.cvr);
   saleBoost.sort((a,b) => b.diff - a.diff);
 
-  // 機会カード
+  // 機会カード（セール除外済み）
   document.getElementById('cvr-opportunity').innerHTML = opportunity.length
     ? opportunity.map(({code, b, c, diff}) => cvrCard(code, b, c, diff, 'opportunity')).join('')
-    : '<div style="color:#aaa;font-size:13px;padding:12px;">該当商品なし（CVR1.5%以上＆アクセス600人未満）</div>';
+    : '<div style="color:#aaa;font-size:13px;padding:12px;">該当商品なし（CVR1.5%以上＆アクセス600人未満の非セール商品）</div>';
+
+  // 除外商品（セール中）
+  const exWrap = document.getElementById('cvr-excluded-wrap');
+  if (excluded.length) {
+    if (!exWrap) {
+      const opp = document.getElementById('cvr-opportunity').parentElement;
+      const div = document.createElement('div');
+      div.id = 'cvr-excluded-wrap';
+      div.style.marginBottom = '20px';
+      div.innerHTML = `<div style="font-size:13px;font-weight:800;color:#888;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+        🚫 セール・除外商品 <span style="font-size:11px;font-weight:400;color:#aaa;">CVRは高いが除外設定あり → 候補から外しています</span>
+      </div><div id="cvr-excluded" class="candidates-grid"></div>`;
+      opp.parentElement.insertBefore(div, opp.nextSibling);
+    }
+    document.getElementById('cvr-excluded').innerHTML =
+      excluded.map(({code,b,c,diff,saleReason}) => cvrCard(code,b,c,diff,'excluded',saleReason)).join('');
+    document.getElementById('cvr-excluded-wrap').style.display = 'block';
+  } else if (exWrap) {
+    exWrap.style.display = 'none';
+  }
 
   // 両月高カード
   if (hasBoth) {
     document.getElementById('cvr-strong-wrap').style.display = strong.length ? 'block' : 'none';
-    document.getElementById('cvr-strong').innerHTML = strong.map(({code,b,c,diff}) => cvrCard(code,b,c,diff,'strong')).join('');
+    document.getElementById('cvr-strong').innerHTML = strong.map(({code,b,c,diff,isSale,saleReason}) => cvrCard(code,b,c,diff,'strong',saleReason)).join('');
     document.getElementById('cvr-sale-wrap').style.display = saleBoost.length ? 'block' : 'none';
     document.getElementById('cvr-sale').innerHTML = saleBoost.map(({code,b,c,diff}) => cvrCard(code,b,c,diff,'sale')).join('');
   }
@@ -843,8 +941,10 @@ function renderCvrAnalysis() {
   tbody.innerHTML = allRows.map(({code, b, c}) => {
     const diff = c ? c.cvr - b.cvr : null;
     const diffStr = diff !== null ? `<span style="color:${diff>0?'#E53935':diff<0?'#43A047':'#888'}">${diff>0?'+':''}${diff.toFixed(2)}pt</span>` : '';
-    return `<tr style="border-bottom:1px solid #F5F5F5;">
-      <td style="padding:7px 10px;font-weight:700;">${escHtml(code)}</td>
+    const saleReason = saleSet.get(code.toUpperCase());
+    const saleBadge = saleReason ? `<span style="display:inline-block;background:#FFEBEE;color:#C62828;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:4px;">⚠️${escHtml(saleReason)}</span>` : '';
+    return `<tr style="border-bottom:1px solid #F5F5F5;${saleReason?'opacity:0.65;':''}">
+      <td style="padding:7px 10px;font-weight:700;">${escHtml(code)}${saleBadge}</td>
       <td style="padding:7px 10px;color:#555;font-size:11px;">${escHtml(b.name)}</td>
       <td style="padding:7px 10px;text-align:right;font-weight:700;">${b.cvr.toFixed(2)}%</td>
       <td style="padding:7px 10px;text-align:right;">${b.access.toLocaleString()}人</td>
@@ -854,11 +954,28 @@ function renderCvrAnalysis() {
   }).join('');
 }
 
-function cvrCard(code, b, c, diff, type) {
+function cvrCard(code, b, c, diff, type, saleReason) {
   const diffBadge = diff !== null
     ? `<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:${diff>0?'#FFEBEE':'#E8F5E9'};color:${diff>0?'#C62828':'#2E7D32'}">比較期間 ${diff>0?'+':''}${diff.toFixed(1)}pt → ${c.cvr.toFixed(2)}%</span>`
     : '';
-  const icon = type==='opportunity'?'💡':type==='strong'?'✅':'⚠️';
+  const icon = type==='opportunity'?'💡':type==='strong'?'✅':type==='excluded'?'🚫':'⚠️';
+
+  if (type === 'excluded') {
+    return `<div class="candidate-card" style="opacity:0.6;background:#F5F5F5;border-left:3px solid #BDBDBD;">
+      <div style="flex-shrink:0;padding-top:2px;">${icon}</div>
+      <div class="candidate-body">
+        <div class="candidate-name" style="color:#888;">${escHtml(code)}</div>
+        <div style="font-size:12px;color:#888;margin-bottom:4px;">${escHtml(b.name)}</div>
+        <div class="candidate-meta">
+          <span>CVR <strong style="color:#888;">${b.cvr.toFixed(2)}%</strong></span>
+          <span>アクセス <strong style="color:#888;">${b.access.toLocaleString()}人</strong></span>
+          <span style="background:#FFEBEE;color:#C62828;padding:2px 7px;border-radius:4px;font-size:11px;">⚠️ ${escHtml(saleReason||'除外設定あり')}</span>
+        </div>
+      </div>
+      <span style="font-size:11px;color:#BDBDBD;white-space:nowrap;">候補から除外</span>
+    </div>`;
+  }
+
   return `<div class="candidate-card">
     <div style="flex-shrink:0;padding-top:2px;">${icon}</div>
     <div class="candidate-body">
