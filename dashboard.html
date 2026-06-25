@@ -569,16 +569,24 @@ function roboTalk() {
       <div>📸 Instagram</div>
       <div>🔍 サーチ</div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
       <label style="font-size:12px;font-weight:700;white-space:nowrap;">表示日数</label>
       <select id="ig-days-select" onchange="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 10px;font-size:13px;">
         <option value="3">直近3日</option>
         <option value="5">直近5日</option>
         <option value="7" selected>直近7日</option>
         <option value="14">直近14日</option>
+        <option value="30">直近30日</option>
+        <option value="60">直近60日</option>
+        <option value="custom">📅 日付を指定</option>
       </select>
+      <div id="ig-custom-date-wrap" style="display:none;gap:6px;align-items:center;">
+        <label style="font-size:12px;font-weight:700;white-space:nowrap;color:#888;">開始日</label>
+        <input type="date" id="ig-custom-start" oninput="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;font-size:13px;">
+        <label style="font-size:12px;font-weight:700;white-space:nowrap;color:#888;">〜 今日</label>
+      </div>
     </div>
-    <div id="ig-rows"></div>
+    <div id="ig-rows" style="max-height:380px;overflow-y:auto;"></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeIgModal()">キャンセル</button>
       <button class="btn-save" onclick="saveIgEntries()">まとめて保存</button>
@@ -1577,25 +1585,52 @@ document.getElementById('ig-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('ig-modal')) closeIgModal();
 });
 
-function renderIgRows() {
-  const days = parseInt(document.getElementById('ig-days-select').value);
-  const container = document.getElementById('ig-rows');
+function getIgDateRange() {
+  const sel = document.getElementById('ig-days-select').value;
   const today = new Date();
-  const rows = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dateStr = toDateStr(d);
+  const wrap = document.getElementById('ig-custom-date-wrap');
+  if (sel === 'custom') {
+    wrap.style.display = 'flex';
+    const startStr = document.getElementById('ig-custom-start').value;
+    if (!startStr) return [];
+    const start = new Date(startStr + 'T00:00:00');
+    const dates = [];
+    for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+      dates.push(toDateStr(new Date(d)));
+    }
+    return dates;
+  } else {
+    wrap.style.display = 'none';
+    const days = parseInt(sel);
+    const dates = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      dates.push(toDateStr(d));
+    }
+    return dates;
+  }
+}
+
+function renderIgRows() {
+  const dates = getIgDateRange();
+  const container = document.getElementById('ig-rows');
+  if (dates.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;font-size:12px;padding:8px 0;">開始日を選択してください</div>';
+    return;
+  }
+  const rows = dates.map(dateStr => {
+    const d = new Date(dateStr + 'T00:00:00');
     const ex = entries.find(e => e.date === dateStr);
-    rows.push({
+    return {
       dateStr,
       weekday: d.toLocaleDateString('ja-JP', { weekday: 'short' }),
-      extVal: ex?.extVisitors  ?? '',
-      intVal: ex?.intVisitors  ?? '',
-      igVal:  ex?.igVisitors   ?? '',
+      extVal: ex?.extVisitors    ?? '',
+      intVal: ex?.intVisitors    ?? '',
+      igVal:  ex?.igVisitors     ?? '',
       srVal:  ex?.searchVisitors ?? '',
-    });
-  }
+    };
+  });
   const inp = (id, val) => `<input type="number" id="${id}" value="${val}" placeholder="—"
     style="width:100%;border:1px solid #E0E0E0;border-radius:6px;padding:6px 6px;font-size:12px;text-align:right;">`;
   container.innerHTML = rows.map(r => `
@@ -1610,13 +1645,9 @@ function renderIgRows() {
 }
 
 function saveIgEntries() {
-  const days = parseInt(document.getElementById('ig-days-select').value);
-  const today = new Date();
+  const dates = getIgDateRange();
   let saved = 0;
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dateStr = toDateStr(d);
+  for (const dateStr of dates) {
     const getVal = id => { const el = document.getElementById(id); return el?.value !== '' ? Number(el.value) : null; };
     const extVal = getVal(`ext-${dateStr}`);
     const intVal = getVal(`int-${dateStr}`);
