@@ -288,15 +288,7 @@
       📣 Meta広告 CSV
     </button>
     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
-    <!-- RPP CSV -->
-    <button class="entry-btn" onclick="document.getElementById('rpp-csv-input').click()" style="margin-top:0;background:#0050B3;padding:10px 18px;font-size:13px;">
-      🔍 RPP CSV
-    </button>
     <input type="file" id="rpp-csv-input" accept=".csv" style="display:none" onchange="importRPPCSV(this)">
-    <!-- RPP拡張 CSV -->
-    <button class="entry-btn" onclick="document.getElementById('rppexp-csv-input').click()" style="margin-top:0;background:#1565C0;padding:10px 18px;font-size:13px;">
-      🔍 RPP拡張 CSV
-    </button>
     <input type="file" id="rppexp-csv-input" accept=".csv" style="display:none" onchange="importRPPExpCSV(this)">
     <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
     <!-- IG・サーチ流入 -->
@@ -448,7 +440,13 @@
 
   <!-- 相関分析タブ -->
   <div class="tab-content" id="tab-correlation">
-    <div class="kpi-period" id="kpi-corr-period"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="kpi-period" id="kpi-corr-period" style="margin-bottom:0;"></div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('rpp-csv-input').click()" style="background:#0050B3;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📥 RPP CSV</button>
+        <button onclick="document.getElementById('rppexp-csv-input').click()" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📥 RPP-EXP CSV</button>
+      </div>
+    </div>
     <!-- ① 総合判定カード -->
     <div id="corr-verdict"></div>
     <!-- ② 次にすべきこと -->
@@ -757,6 +755,8 @@ function roboTalk() {
       <button class="btn-save" onclick="saveCalEvent()">追加する</button>
     </div>
   </div>
+</div>
+
 <!-- ⚙️ 目標値設定モーダル -->
 <div class="modal-overlay" id="settings-modal">
   <div class="modal" style="max-width:420px;">
