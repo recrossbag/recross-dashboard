@@ -305,6 +305,10 @@
     </button>
     <!-- 区切り -->
     <div style="flex:1;"></div>
+    <!-- 目標値設定 -->
+    <button onclick="openSettings()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 14px;font-size:13px;color:#555;cursor:pointer;" title="目標値を設定">
+      ⚙️ 目標設定
+    </button>
     <!-- 印刷 -->
     <button onclick="openReport()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 16px;font-size:13px;color:#555;cursor:pointer;white-space:nowrap;">
       🖨️ レポート印刷
@@ -753,6 +757,38 @@ function roboTalk() {
       <button class="btn-save" onclick="saveCalEvent()">追加する</button>
     </div>
   </div>
+<!-- ⚙️ 目標値設定モーダル -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="max-width:420px;">
+    <h2>⚙️ 目標値の設定</h2>
+    <p style="font-size:12px;color:#888;margin:-8px 0 16px;">変更すると判定カード・グラフの目標ラインに反映されます</p>
+    <div class="date-row" style="margin-bottom:12px;">
+      <label style="width:160px;font-size:13px;">ROAS目標</label>
+      <input type="number" id="set-roas" min="0" step="100" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">%</span>
+    </div>
+    <div class="date-row" style="margin-bottom:12px;">
+      <label style="width:160px;font-size:13px;">CTR目標（Meta広告）</label>
+      <input type="number" id="set-ctr" min="0" step="0.1" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">%</span>
+    </div>
+    <div class="date-row" style="margin-bottom:12px;">
+      <label style="width:160px;font-size:13px;">CPC目標（Meta広告）</label>
+      <input type="number" id="set-cpc" min="0" step="1" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">¥以下</span>
+    </div>
+    <div class="date-row" style="margin-bottom:20px;">
+      <label style="width:160px;font-size:13px;">IG流入目標（月間）</label>
+      <input type="number" id="set-ig" min="0" step="50" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">人</span>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeSettings()" style="padding:9px 20px;border:1px solid #CCC;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">キャンセル</button>
+      <button onclick="saveSettings()" style="padding:9px 20px;border:none;border-radius:8px;background:#26A69A;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">保存する</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -777,6 +813,9 @@ let calEventsCache = [];
 let charts  = {};
 let dbReady = false;
 
+// ── 目標値設定 ──
+let settings = { targetRoas:1000, targetCtr:1.5, targetCpc:30, targetIg:500 };
+
 function saveEntries(arr) {
   entries = arr;
   DATA_DOC.set({ entries: arr }, { merge: true });
@@ -784,6 +823,25 @@ function saveEntries(arr) {
 function saveEvents(arr) {
   events = arr;
   DATA_DOC.set({ events: arr }, { merge: true });
+}
+function openSettings() {
+  document.getElementById('set-roas').value = settings.targetRoas;
+  document.getElementById('set-ctr').value  = settings.targetCtr;
+  document.getElementById('set-cpc').value  = settings.targetCpc;
+  document.getElementById('set-ig').value   = settings.targetIg;
+  document.getElementById('settings-modal').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+function saveSettings() {
+  settings.targetRoas = parseFloat(document.getElementById('set-roas').value) || 1000;
+  settings.targetCtr  = parseFloat(document.getElementById('set-ctr').value)  || 1.5;
+  settings.targetCpc  = parseFloat(document.getElementById('set-cpc').value)  || 30;
+  settings.targetIg   = parseInt(document.getElementById('set-ig').value)     || 500;
+  DATA_DOC.set({ settings }, { merge: true });
+  closeSettings();
+  renderAll();
 }
 
 // Firestore リアルタイムリスナー
@@ -798,6 +856,7 @@ DATA_DOC.onSnapshot(doc => {
   calEventsCache = data.calEvents      || [];
   customCatColors = data.catColors   || {};
   titleColors     = data.titleColors || {};
+  if (data.settings) Object.assign(settings, data.settings);
   applyCatColorToLegend();
   // 自動修復：日付フォーマット重複・空行を一度だけ整理（修復不要なら何もしない＝ループしない）
   if (needsEntryRepair(entries)) {
@@ -967,8 +1026,8 @@ function renderKPIs() {
   const freqVals = P.map(e => e.freq).filter(v => v != null && v !== '');
   const freq = freqVals.length ? freqVals.reduce((s, v) => s + Number(v), 0) / freqVals.length : null;
   document.getElementById('kpi-ad').innerHTML = [
-    kpiCard('CTR（平均）', ctr, 2, '%', '目標 1.5%↑', v => v >= 1.5 ? 'ok' : v >= 1.0 ? 'warn' : 'bad', null, 'クリック率（Click Through Rate）\n広告を見た人のうちクリックした割合。\n計算：クリック数 ÷ インプレッション × 100\n出所：Meta広告マネージャ CSV\n目標：1.5%以上'),
-    kpiCard('CPC（平均）', cpc, 0, '¥', '目標 ¥30↓', v => v <= 30 ? 'ok' : v <= 40 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV\n目標：¥30以下'),
+    kpiCard('CTR（平均）', ctr, 2, '%', `目標 ${settings.targetCtr}%↑`, v => v >= settings.targetCtr ? 'ok' : v >= settings.targetCtr*0.67 ? 'warn' : 'bad', null, 'クリック率（Click Through Rate）\n広告を見た人のうちクリックした割合。\n計算：クリック数 ÷ インプレッション × 100\n出所：Meta広告マネージャ CSV'),
+    kpiCard('CPC（平均）', cpc, 0, '¥', `目標 ¥${settings.targetCpc}↓`, v => v <= settings.targetCpc ? 'ok' : v <= settings.targetCpc*1.33 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
     kpiCard('クリック数（合計）', tClicks, 0, '回', '', null, null, '広告をクリックした回数の合計。\n出所：Meta広告マネージャ CSV'),
     kpiCard('インプレッション（合計）', tImp, 0, '回', '', null, null, '広告が表示された回数の合計。\n同じ人に複数回表示されてもカウント。\n出所：Meta広告マネージャ CSV'),
     kpiCard('消化予算（合計）', tBudget, 0, '¥', '', null, null, '期間中に使用した広告費の合計。\n出所：Meta広告マネージャ CSV'),
@@ -984,7 +1043,7 @@ function renderKPIs() {
     kpiCard('楽天 全体アクセス（合計）', tVis, 0, '人', '', null, null, '楽天市場の店舗ページへのアクセス人数（ユニーク）。\n出所：楽天RMS「データダウンロード＞店舗データ」CSV'),
     kpiCard('転換率（CVR）', cvr, 2, '%', '売上件数÷アクセス', v => v >= 3 ? 'ok' : v >= 1.5 ? 'warn' : 'bad', null, '購入転換率（Conversion Rate）\nアクセスした人のうち実際に購入した割合。\n計算：売上件数 ÷ アクセス人数 × 100\n出所：楽天RMS CSV（楽天CSVを取り込んだ場合のみ表示）'),
     kpiCard('客単価', aov, 0, '¥', '売上÷売上件数', null, null, '1件の注文あたりの平均売上金額。\n計算：売上金額 ÷ 売上件数\n出所：楽天RMS CSV'),
-    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null, null, 'InstagramからQRコードや広告経由で\n楽天ショップに来たアクセス人数。\n出所：楽天RMS「参照元・検索キーワード分析」\nInstagramの行をダッシュボードに手入力'),
+    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', `月間目標 ${settings.targetIg.toLocaleString()}人↑`, null, null, 'InstagramからQRコードや広告経由で\n楽天ショップに来たアクセス人数。\n出所：楽天RMS「参照元・検索キーワード分析」\nInstagramの行をダッシュボードに手入力'),
   ].join('');
 
   // ROAS・広告効果KPI
@@ -998,12 +1057,12 @@ function renderKPIs() {
   const igPerClick  = (tClicks > 0 && tIg > 0) ? parseFloat((tIg / tClicks * 100).toFixed(1)) : null;
   const roasEl = document.getElementById('kpi-roas');
   if (roasEl) roasEl.innerHTML = [
-    kpiCard('総合ROAS', roasTotal, 0, '%', '目標 1000%↑', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, '総広告費対売上比率\n計算：売上 ÷ (Meta + RPP + RPP拡張) × 100\n全広告を合わせた費用対効果。最も実態に近い数値。\n出所：楽天RMS CSV ＋ Meta CSV ＋ RPP CSV ＋ RPP拡張 CSV'),
-    kpiCard('Meta ROAS', roasMeta, 0, '%', '', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, 'Meta（Instagram）広告単体のROAS\n計算：売上 ÷ Meta広告費 × 100\n※楽天広告による売上も含むため参考値'),
-    kpiCard('楽天広告 ROAS', roasRakuten, 0, '%', '', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, '楽天広告（RPP+RPP拡張）単体のROAS\n計算：売上 ÷ (RPP+RPP拡張費) × 100\n※Meta広告による売上も含むため参考値'),
+    kpiCard('総合ROAS', roasTotal, 0, '%', `目標 ${settings.targetRoas.toLocaleString()}%↑`, v => v >= settings.targetRoas ? 'ok' : v >= settings.targetRoas*0.5 ? 'warn' : 'bad', null, '総広告費対売上比率\n計算：売上 ÷ (Meta + RPP + RPP拡張) × 100\n全広告を合わせた費用対効果。最も実態に近い数値。\n出所：楽天RMS CSV ＋ Meta CSV ＋ RPP CSV ＋ RPP拡張 CSV'),
+    kpiCard('Meta ROAS', roasMeta, 0, '%', '', v => v >= settings.targetRoas ? 'ok' : v >= settings.targetRoas*0.5 ? 'warn' : 'bad', null, 'Meta（Instagram）広告単体のROAS\n計算：売上 ÷ Meta広告費 × 100\n※楽天広告による売上も含むため参考値'),
+    kpiCard('楽天広告 ROAS', roasRakuten, 0, '%', '', v => v >= settings.targetRoas ? 'ok' : v >= settings.targetRoas*0.5 ? 'warn' : 'bad', null, '楽天広告（RPP+RPP拡張）単体のROAS\n計算：売上 ÷ (RPP+RPP拡張費) × 100\n※Meta広告による売上も含むため参考値'),
     kpiCard('総広告費', tAllBudget || null, 0, '¥', `Meta:¥${tBudget.toLocaleString()} 楽天:¥${tRakutenAd.toLocaleString()}`, null, null, '全広告費の合計。\nMeta広告費 ＋ RPP費用 ＋ RPP拡張費用。\n出所：Meta CSV ＋ RPP CSV ＋ RPP拡張 CSV'),
     kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷Metaクリック', null, null, '広告をクリックした人のうち\n実際に楽天ショップへ流入した割合。\n計算：IG→楽天流入数 ÷ Meta広告クリック数 × 100'),
-    kpiCard('Meta CPC', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad', null, 'Meta広告クリック単価\n計算：Meta消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
+    kpiCard('Meta CPC', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', `目標¥${settings.targetCpc}↓`, v => v <= settings.targetCpc ? 'ok' : v <= settings.targetCpc*1.33 ? 'warn' : 'bad', null, 'Meta広告クリック単価\n計算：Meta消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
   ].join('');
 
   // ① 総合判定カード ＋ ② 次にすべきこと（総合ROASを使用）
@@ -1043,9 +1102,9 @@ function renderCorrelationSummary(roas, ctr, tIg, tBudget) {
     if (val >= ok)   return { emoji:'🟡', cls:'warn', text:'要注意' };
     return               { emoji:'🔴', cls:'bad',  text:'要改善' };
   }
-  const roasJ = judge(roas,  1000, 500);
-  const ctrJ  = judge(ctr,   1.5,  1.0);
-  const igJ   = judge(tIg > 0 ? tIg : null, 500, 200);
+  const roasJ = judge(roas,  settings.targetRoas, settings.targetRoas*0.5);
+  const ctrJ  = judge(ctr,   settings.targetCtr,  settings.targetCtr*0.67);
+  const igJ   = judge(tIg > 0 ? tIg : null, settings.targetIg, settings.targetIg*0.4);
 
   verdictEl.innerHTML = `
     <div class="verdict-card ${roasJ.cls}">
@@ -1053,21 +1112,21 @@ function renderCorrelationSummary(roas, ctr, tIg, tBudget) {
       <div class="verdict-label">広告の費用対効果<br>（ROAS）</div>
       <div class="verdict-val">${roas != null ? roas.toLocaleString() + '%' : '—'}</div>
       <div class="verdict-status">${roasJ.text}</div>
-      <div class="verdict-hint">目標 1000%以上</div>
+      <div class="verdict-hint">目標 ${settings.targetRoas.toLocaleString()}%以上</div>
     </div>
     <div class="verdict-card ${ctrJ.cls}">
       <div class="verdict-emoji">${ctrJ.emoji}</div>
       <div class="verdict-label">広告クリック率<br>（CTR）</div>
       <div class="verdict-val">${ctr != null ? ctr.toFixed(2) + '%' : '—'}</div>
       <div class="verdict-status">${ctrJ.text}</div>
-      <div class="verdict-hint">目標 1.5%以上</div>
+      <div class="verdict-hint">目標 ${settings.targetCtr}%以上</div>
     </div>
     <div class="verdict-card ${igJ.cls}">
       <div class="verdict-emoji">${igJ.emoji}</div>
       <div class="verdict-label">IG→楽天<br>流入人数</div>
       <div class="verdict-val">${(tIg > 0) ? tIg.toLocaleString() + '人' : '—'}</div>
       <div class="verdict-status">${igJ.text}</div>
-      <div class="verdict-hint">月間目標 500人以上</div>
+      <div class="verdict-hint">月間目標 ${settings.targetIg.toLocaleString()}人以上</div>
     </div>
   `;
 
@@ -1081,20 +1140,20 @@ function renderCorrelationSummary(roas, ctr, tIg, tBudget) {
     // ROAS判定
     if (roas == null) {
       actions.push({ icon:'📥', text:'楽天売上CSVを取り込むと、ROASが計算できます。' });
-    } else if (roas >= 1000) {
+    } else if (roas >= settings.targetRoas) {
       actions.push({ icon:'✅', text:`ROAS ${roas.toLocaleString()}% — 広告効果は良好です。このまま継続し、予算を増やすことも検討できます。` });
-    } else if (roas >= 500) {
-      actions.push({ icon:'⚠️', text:`ROAS ${roas.toLocaleString()}% — 広告費は回収できていますが目標未達。効果が出た日・期間のクリエイティブを確認し、同じ内容で再出稿しましょう。` });
+    } else if (roas >= settings.targetRoas * 0.5) {
+      actions.push({ icon:'⚠️', text:`ROAS ${roas.toLocaleString()}% — 広告費は回収できていますが目標（${settings.targetRoas.toLocaleString()}%）未達。効果が出た日・期間のクリエイティブを確認し、同じ内容で再出稿しましょう。` });
     } else {
       actions.push({ icon:'🚨', text:`ROAS ${roas.toLocaleString()}% — 広告費に見合った売上が出ていません。一時的に予算を抑え、過去に効果があったクリエイティブに絞って配信し直しましょう。` });
     }
 
     // CTR判定
     if (ctr != null) {
-      if (ctr < 1.0) {
+      if (ctr < settings.targetCtr * 0.67) {
         actions.push({ icon:'🎨', text:`CTR ${ctr.toFixed(2)}% — 広告は表示されているがクリックされていません。画像・キャプション・ターゲット設定を見直しましょう。` });
-      } else if (ctr < 1.5) {
-        actions.push({ icon:'🔍', text:`CTR ${ctr.toFixed(2)}% — クリック率がやや低め。パフォーマンスが高かった日の投稿を参考に、クリエイティブのA/Bテストを試してみましょう。` });
+      } else if (ctr < settings.targetCtr) {
+        actions.push({ icon:'🔍', text:`CTR ${ctr.toFixed(2)}% — クリック率がやや低め（目標${settings.targetCtr}%）。パフォーマンスが高かった日の投稿を参考に、クリエイティブのA/Bテストを試してみましょう。` });
       } else {
         actions.push({ icon:'👍', text:`CTR ${ctr.toFixed(2)}% — 広告クリック率は良好。今のクリエイティブは引き続き使えます。` });
       }
@@ -1103,10 +1162,10 @@ function renderCorrelationSummary(roas, ctr, tIg, tBudget) {
     // IG流入判定
     if (tIg <= 0) {
       actions.push({ icon:'📝', text:'IG→楽天 流入データが未入力です。「IG・サーチ流入入力」から数値を入れると、広告との相関が分析できます。' });
-    } else if (tIg < 200) {
+    } else if (tIg < settings.targetIg * 0.4) {
       actions.push({ icon:'📸', text:`IG流入 ${tIg.toLocaleString()}人 — 少ない状態です。投稿へのリンク導線（プロフィールURL・ストーリーズ・QRコード）を増やしましょう。` });
-    } else if (tIg < 500) {
-      actions.push({ icon:'📈', text:`IG流入 ${tIg.toLocaleString()}人 — 増加中ですが月間目標500人まであと${(500 - tIg)}人。投稿頻度を上げるか、広告でリーチを広げましょう。` });
+    } else if (tIg < settings.targetIg) {
+      actions.push({ icon:'📈', text:`IG流入 ${tIg.toLocaleString()}人 — 増加中ですが月間目標${settings.targetIg.toLocaleString()}人まであと${(settings.targetIg - tIg).toLocaleString()}人。投稿頻度を上げるか、広告でリーチを広げましょう。` });
     } else {
       actions.push({ icon:'🎉', text:`IG流入 ${tIg.toLocaleString()}人 — 目標達成！次は流入後の購入率を上げるため、楽天ページの写真・説明文の改善も検討しましょう。` });
     }
@@ -1235,11 +1294,11 @@ function renderCharts() {
   // 広告
   makeChart('chart-ctr', 'line', [
     { label:'CTR(%)', data: d.map(e=>e.ctr||null), borderColor:'#26A69A', backgroundColor:'rgba(38,166,154,0.08)', tension:0.3, fill:true },
-    targetLine('目標1.5%', 1.5, '#FFB74D'),
+    targetLine(`目標${settings.targetCtr}%`, settings.targetCtr, '#FFB74D'),
   ]);
   makeChart('chart-cpc', 'line', [
     { label:'CPC(¥)', data: d.map(e=>e.cpc||null), borderColor:'#EF5350', backgroundColor:'rgba(239,83,80,0.08)', tension:0.3, fill:true },
-    targetLine('目標¥30', 30, '#FFB74D'),
+    targetLine(`目標¥${settings.targetCpc}`, settings.targetCpc, '#FFB74D'),
   ]);
   makeChart('chart-clicks', 'bar', [
     { label:'クリック数', data: d.map(e=>e.clicks||null), backgroundColor:'rgba(121,134,203,0.7)', yAxisID:'y' },
@@ -1356,7 +1415,7 @@ function renderCharts() {
         type: 'line',
         data: { labels: chartLabels, datasets: [
           { label:'ROAS(%)', data: roasData, borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true, pointRadius:4 },
-          targetLine('目標1000%', 1000, '#FFB74D'),
+          targetLine(`目標${settings.targetRoas.toLocaleString()}%`, settings.targetRoas, '#FFB74D'),
         ]},
         options: { ...CHART_DEFAULTS },
         plugins: [makeEventPlugin(d)]
