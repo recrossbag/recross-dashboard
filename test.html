@@ -288,6 +288,11 @@
       📣 Meta広告 CSV
     </button>
     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
+    <!-- RPP CSV -->
+    <button class="entry-btn" onclick="document.getElementById('rpp-csv-input').click()" style="margin-top:0;background:#0050B3;padding:10px 18px;font-size:13px;">
+      🔍 RPP CSV
+    </button>
+    <input type="file" id="rpp-csv-input" accept=".csv" style="display:none" onchange="importRPPCSV(this)">
     <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
     <!-- IG・サーチ流入 -->
     <button class="entry-btn" onclick="openIgModal()" style="margin-top:0;background:#E64A19;padding:10px 18px;font-size:13px;">
@@ -977,19 +982,25 @@ function renderKPIs() {
     kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null, null, 'InstagramからQRコードや広告経由で\n楽天ショップに来たアクセス人数。\n出所：楽天RMS「参照元・検索キーワード分析」\nInstagramの行をダッシュボードに手入力'),
   ].join('');
 
-  // ROAS・広告効果KPI（tBudget・tClicksは上の広告KPI計算済みの変数を流用）
-  const roas = (tSales > 0 && tBudget > 0) ? Math.round(tSales / tBudget * 100) : null;
+  // ROAS・広告効果KPI
+  const tRpp     = sum('rppBudget');
+  const tAllBudget = tBudget + tRpp;
+  const roasTotal = (tSales > 0 && tAllBudget > 0) ? Math.round(tSales / tAllBudget * 100) : null;
+  const roasMeta  = (tSales > 0 && tBudget > 0)    ? Math.round(tSales / tBudget * 100)    : null;
+  const roasRpp   = (tSales > 0 && tRpp > 0)        ? Math.round(tSales / tRpp * 100)        : null;
   const igPerClick = (tClicks > 0 && tIg > 0) ? parseFloat((tIg / tClicks * 100).toFixed(1)) : null;
   const roasEl = document.getElementById('kpi-roas');
   if (roasEl) roasEl.innerHTML = [
-    kpiCard('ROAS', roas, 0, '%', '目標 1000%↑', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, '広告費対売上比率（Return On Ad Spend）\n広告1円あたり何円の売上が得られたか。\n計算：売上金額 ÷ 広告費 × 100\n1000%＝広告費の10倍売れた状態。\n出所：売上（楽天RMS CSV）＋広告費（Meta CSV）'),
-    kpiCard('広告費（合計）', tBudget, 0, '¥', '', null, null, '期間中に使用したMeta（Instagram）広告費の合計。\n出所：Meta広告マネージャ CSV'),
-    kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷広告クリック', null, null, '広告をクリックした人のうち\n実際に楽天ショップへ流入した割合。\n計算：IG→楽天流入数 ÷ 広告クリック数 × 100\n出所：Meta CSV ＋ 楽天RMS手入力'),
-    kpiCard('クリック単価（CPC）', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
+    kpiCard('総合ROAS（Meta+RPP）', roasTotal, 0, '%', '目標 1000%↑', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, '総広告費対売上比率\n計算：売上金額 ÷ (Meta広告費 + RPP費用) × 100\n全広告を合わせた費用対効果。最も実態に近いROAS。\n出所：売上（楽天RMS CSV）＋Meta CSV＋RPP CSV'),
+    kpiCard('Meta ROAS', roasMeta, 0, '%', '', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, 'Meta（Instagram）広告単体のROAS\n計算：売上金額 ÷ Meta広告費 × 100\n※他広告による売上も含むため参考値'),
+    kpiCard('RPP ROAS', roasRpp, 0, '%', '', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, '楽天RPP広告単体のROAS\n計算：売上金額 ÷ RPP費用 × 100\n※他広告による売上も含むため参考値\nRPP CSVを取り込むと表示されます'),
+    kpiCard('総広告費（合計）', tAllBudget || null, 0, '¥', `Meta:¥${tBudget.toLocaleString()} RPP:¥${tRpp.toLocaleString()}`, null, null, '全広告費の合計。\nMeta広告費 ＋ RPP費用。\n出所：Meta CSV ＋ RPP CSV'),
+    kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷Metaクリック', null, null, '広告をクリックした人のうち\n実際に楽天ショップへ流入した割合。\n計算：IG→楽天流入数 ÷ 広告クリック数 × 100\n出所：Meta CSV ＋ 楽天RMS手入力'),
+    kpiCard('Meta CPC', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad', null, 'Meta広告クリック単価\n計算：Meta消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
   ].join('');
 
-  // ① 総合判定カード ＋ ② 次にすべきこと
-  renderCorrelationSummary(roas, ctr, tIg, tBudget);
+  // ① 総合判定カード ＋ ② 次にすべきこと（総合ROASを使用）
+  renderCorrelationSummary(roasTotal, ctr, tIg, tAllBudget);
 }
 
 function kpiCard(label, value, decimals, unit, target, colorFn, wow, tip) {
@@ -1132,11 +1143,11 @@ function getMonthlyData() {
     if (!ym) return;
     if (!byMonth[ym]) byMonth[ym] = {
       sales:0, visitors:0, igVisitors:0, searchVisitors:0,
-      extVisitors:0, intVisitors:0, clicks:0, adImp:0, budget:0,
+      extVisitors:0, intVisitors:0, clicks:0, adImp:0, budget:0, rppBudget:0,
       ctrSum:0, ctrN:0, cpcSum:0, cpcN:0, freqSum:0, freqN:0
     };
     const m = byMonth[ym];
-    ['sales','visitors','igVisitors','searchVisitors','extVisitors','intVisitors','clicks','adImp','budget'].forEach(k => {
+    ['sales','visitors','igVisitors','searchVisitors','extVisitors','intVisitors','clicks','adImp','budget','rppBudget'].forEach(k => {
       if (e[k] != null) m[k] += Number(e[k]);
     });
     if (e.ctr  != null) { m.ctrSum  += Number(e.ctr);  m.ctrN++;  }
@@ -1150,7 +1161,7 @@ function getMonthlyData() {
       sales: m.sales || null, visitors: m.visitors || null,
       igVisitors: m.igVisitors || null, searchVisitors: m.searchVisitors || null,
       extVisitors: m.extVisitors || null, intVisitors: m.intVisitors || null,
-      clicks: m.clicks || null, adImp: m.adImp || null, budget: m.budget || null,
+      clicks: m.clicks || null, adImp: m.adImp || null, budget: m.budget || null, rppBudget: m.rppBudget || null,
       ctr:  m.ctrN  ? parseFloat((m.ctrSum  / m.ctrN).toFixed(2))  : null,
       cpc:  m.cpcN  ? Math.round(m.cpcSum  / m.cpcN)                : null,
       freq: m.freqN ? parseFloat((m.freqSum / m.freqN).toFixed(2)) : null,
@@ -1246,7 +1257,8 @@ function renderCharts() {
 
   // ── 広告×売上 相関チャート ──
   const roasData = d.map(e => {
-    const s = Number(e.sales)||0, b = Number(e.budget)||0;
+    const s = Number(e.sales)||0;
+    const b = (Number(e.budget)||0) + (Number(e.rppBudget)||0); // Meta+RPP合計
     return (s > 0 && b >= 100) ? Math.round(s / b * 100) : null; // 広告費¥100未満の日は除外
   });
 
@@ -2337,6 +2349,86 @@ function seedAndSave() {
 // ─────────────────────────────────────────────
 // Meta広告CSVインポート
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// RPP CSVインポート
+// ─────────────────────────────────────────────
+function importRPPCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const rows = parseRPPCSV(e.target.result);
+      if (rows.length === 0) { alert('有効なRPPデータが見つかりませんでした'); return; }
+      let added = 0, updated = 0;
+      rows.forEach(row => {
+        const idx = entries.findIndex(en => en.date === row.date);
+        if (idx >= 0) {
+          entries[idx].rppBudget = row.rppBudget;
+          entries[idx].rppClicks = row.rppClicks;
+          updated++;
+        } else {
+          entries.push({ date: row.date, rppBudget: row.rppBudget, rppClicks: row.rppClicks });
+          added++;
+        }
+      });
+      entries.sort((a,b) => a.date.localeCompare(b.date));
+      saveEntries(entries);
+      renderAll();
+      alert(`RPP取り込み完了：${added}件追加、${updated}件更新`);
+    } catch(err) {
+      alert('RPP CSVの読み込みに失敗しました: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file, 'Shift-JIS');
+}
+
+function parseRPPCSV(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // ヘッダー行を探す（日付 + 実績額(合計) を含む行）
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    if (lines[i].includes('日付') && lines[i].includes('実績額')) {
+      headerIdx = i; break;
+    }
+  }
+  if (headerIdx < 0) return [];
+
+  // CSVをカンマ区切りでパース（クォート対応）
+  function splitCSV(line) {
+    const fields = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    fields.push(cur.trim());
+    return fields;
+  }
+
+  const header = splitCSV(lines[headerIdx]).map(h => h.replace(/"/g,'').trim());
+  const dateIdx   = header.findIndex(h => h === '日付');
+  const spendIdx  = header.findIndex(h => h === '実績額(合計)');
+  const clickIdx  = header.findIndex(h => h === 'クリック数(合計)');
+  if (dateIdx < 0 || spendIdx < 0) return [];
+
+  const result = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = splitCSV(lines[i]).map(c => c.replace(/"/g,'').trim());
+    if (!cols[dateIdx]) continue;
+    // 日付変換: "2026年06月01日" → "2026-06-01"
+    const dateStr = cols[dateIdx].replace(/(\d{4})年(\d{2})月(\d{2})日/, '$1-$2-$3');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+    const spend  = parseFloat(cols[spendIdx]) || 0;
+    const clicks = parseInt(cols[clickIdx])   || 0;
+    if (spend > 0) result.push({ date: dateStr, rppBudget: spend, rppClicks: clicks });
+  }
+  return result;
+}
+
 function importCSV(input) {
   const file = input.files[0];
   if (!file) return;
