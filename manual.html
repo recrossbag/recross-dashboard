@@ -10,9 +10,9 @@
 
   /* ナビ */
   .nav { background: #2D2D2D; color: #fff; padding: 0; position: sticky; top: 0; z-index: 100; display: flex; }
-  .nav-title { padding: 14px 24px; font-size: 15px; font-weight: 700; border-right: 1px solid #444; }
+  .nav-title { padding: 14px 24px; font-size: 15px; font-weight: 700; border-right: 1px solid #444; white-space: nowrap; }
   .nav-tabs { display: flex; }
-  .nav-tab { padding: 14px 20px; font-size: 13px; cursor: pointer; opacity: 0.6; border-bottom: 3px solid transparent; transition: all 0.15s; }
+  .nav-tab { padding: 14px 20px; font-size: 13px; cursor: pointer; opacity: 0.6; border-bottom: 3px solid transparent; transition: all 0.15s; white-space: nowrap; }
   .nav-tab:hover { opacity: 0.9; }
   .nav-tab.active { opacity: 1; border-bottom-color: #FF7043; }
 
@@ -30,12 +30,14 @@
   .steps { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
   .step { background: #fff; border: 1px solid #E8E8E8; border-radius: 10px; padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start; }
   .step-num { background: #FF7043; color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .step-num.blue { background: #1565C0; }
   .step-body { flex: 1; }
   .step-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
   .step-desc { font-size: 13px; color: #666; }
   .step-tag { display: inline-block; background: #FFF3E0; color: #E65100; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-top: 6px; }
   .step-tag.csv { background: #E8F5E9; color: #2E7D32; }
   .step-tag.manual { background: #E3F2FD; color: #1565C0; }
+  .step-tag.opt { background: #F3E5F5; color: #7B1FA2; }
 
   /* テーブル */
   table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #E8E8E8; margin-bottom: 20px; font-size: 13px; }
@@ -57,10 +59,13 @@
   .badge.warn { background: #FFF3E0; color: #E65100; }
   .badge.bad  { background: #FFEBEE; color: #C62828; }
   .badge.info { background: #E3F2FD; color: #1565C0; }
+  .badge.csv  { background: #E8F5E9; color: #2E7D32; }
 
   /* ヒント */
   .tip { background: #FFF8E1; border-left: 4px solid #FFB300; border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 12px 0; font-size: 13px; color: #5D4037; }
   .tip strong { color: #E65100; }
+  .tip.blue { background: #E3F2FD; border-left-color: #1565C0; color: #1A237E; }
+  .tip.blue strong { color: #1565C0; }
 
   /* カラー凡例 */
   .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -74,6 +79,12 @@
   .faq summary::before { content: '＋ '; color: #FF7043; }
   details[open] summary::before { content: '－ '; }
   .faq-body { padding: 14px 18px; background: #FAFAFA; font-size: 13px; color: #555; border-top: 1px solid #F0F0F0; }
+
+  /* ボタン例示 */
+  .btn-ex { display: inline-block; background: #2D2D2D; color: #fff; border-radius: 7px; padding: 3px 10px; font-size: 12px; font-weight: 700; margin: 0 2px; }
+  .btn-ex.blue { background: #0050B3; }
+  .btn-ex.orange { background: #E64A19; }
+  .btn-ex.outline { background: none; border: 1px solid #CCC; color: #555; }
 
   @media print {
     .nav { display: none; }
@@ -138,6 +149,29 @@
     <div class="step">
       <div class="step-num">5</div>
       <div class="step-body">
+        <div class="step-title">RPP・RPP-EXP CSVをダウンロード（楽天広告費用）</div>
+        <div class="step-desc">
+          楽天RMS → 広告 → RPP → レポート → 期間指定 → CSVダウンロード<br>
+          同様に RPP拡張（RPP-EXP）のレポートもダウンロード
+        </div>
+        <span class="step-tag csv">📂 CSV取込</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">「相関分析」タブを開き、RPP CSV・RPP-EXP CSVを取り込む</div>
+        <div class="step-desc">
+          タブ右上の <span class="btn-ex blue">📥 RPP CSV</span> <span class="btn-ex blue">📥 RPP-EXP CSV</span> ボタンを押してCSVを選択。<br>
+          楽天広告費が取り込まれ、ROASの計算に自動反映されます。
+        </div>
+        <span class="step-tag csv">自動入力</span>
+        <span class="step-tag opt">楽天広告を使っている場合のみ</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
         <div class="step-title">「📸 IG・サーチ流入入力」ボタンから流入数を入力</div>
         <div class="step-desc">楽天RMS → 3 アクセス・流入分析 → 参照元・検索キーワード分析<br>
           ・楽天外アクセス：エリアで「楽天市場外」のみONにして確認<br>
@@ -152,6 +186,50 @@
 
   <div class="tip">⏰ <strong>入力タイミング：週1〜2回</strong>でOKです。楽天イベント（マラソン・スーパーSALE）の直後は忘れずに！<br>
   ※ データを修正したい場合は右上の「⋯」→「データを手入力する」から個別に修正できます。</div>
+
+  <h3>目標値の設定</h3>
+  <p>ROAS・CTR・CPC・IG流入の目標値は変更できます。設定するとグラフの目標ライン・判定カード・レポートに自動反映されます。</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num blue">1</div>
+      <div class="step-body">
+        <div class="step-title">ツールバーの <span class="btn-ex outline">⚙️ 目標設定</span> をクリック</div>
+        <div class="step-desc">設定モーダルが開きます。</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num blue">2</div>
+      <div class="step-body">
+        <div class="step-title">各目標値を入力して「保存する」</div>
+        <div class="step-desc">ROAS（%）・CTR（%）・CPC（¥）・IG流入（人/月）を入力。<br>設定はクラウドに保存され、次回以降も引き継がれます。</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>相関分析タブの便利機能</h3>
+  <table>
+    <thead>
+      <tr><th>機能</th><th>使い方</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>🟢🟡🔴 判定カード</td>
+        <td>ROAS・CTR・IG流入が目標に対してどの状態かを色で表示。タブを開くと自動更新。</td>
+      </tr>
+      <tr>
+        <td>→ アクション提案</td>
+        <td>データをもとに「次にやること」が自動で表示される。</td>
+      </tr>
+      <tr>
+        <td>グラフのイベントマーカー</td>
+        <td>カレンダーに登録したセール・マラソンが縦線でグラフに表示される。</td>
+      </tr>
+      <tr>
+        <td>📸 スクショ</td>
+        <td>タブ右上のボタンを押すと、タブ全体をPNG画像として保存できる。報告・共有に便利。</td>
+      </tr>
+    </tbody>
+  </table>
 
   <h3>カレンダーの使い方</h3>
   <div class="steps">
@@ -185,7 +263,7 @@
     </thead>
     <tbody>
       <tr>
-        <td>📣 広告（CTR・CPC等）</td>
+        <td>📣 Meta広告（CTR・CPC等）</td>
         <td>Meta広告マネージャ</td>
         <td>キャンペーン → 内訳 → 日 → エクスポート <span class="badge csv">CSV</span></td>
       </tr>
@@ -195,12 +273,24 @@
         <td>6 データダウンロード → 店舗データ → 日次 <span class="badge csv">CSV</span></td>
       </tr>
       <tr>
+        <td>📦 RPP広告費</td>
+        <td>楽天RMS 広告</td>
+        <td>広告 → RPP → レポート → CSVダウンロード <span class="badge csv">CSV</span></td>
+      </tr>
+      <tr>
+        <td>📦 RPP拡張（EXP）広告費</td>
+        <td>楽天RMS 広告</td>
+        <td>広告 → RPP拡張 → レポート → CSVダウンロード <span class="badge csv">CSV</span></td>
+      </tr>
+      <tr>
         <td>🌐 楽天外・楽天内アクセス<br>📸 Instagram流入<br>🔍 楽天サーチ流入</td>
         <td>楽天RMS 参照元・検索キーワード分析</td>
         <td>3 アクセス・流入分析 → 参照元・検索キーワード分析 <span class="badge info">手動</span></td>
       </tr>
     </tbody>
   </table>
+
+  <div class="tip blue">💡 <strong>「📋 できること」ボタン</strong>でダッシュボードの全機能一覧がいつでも確認できます。ツールバー右上にあります。</div>
 </div>
 
 <!-- ===== 数字の見方編 ===== -->
@@ -217,26 +307,58 @@
   </div>
   <p>KPIカードの右に <span style="color:#43A047;font-weight:700;">▲12%</span> / <span style="color:#E53935;font-weight:700;">▼5%</span> と表示されるのは<strong>前回データとの比較</strong>です。</p>
 
+  <h3>ROAS（広告費対効果）</h3>
+
+  <div class="metric">
+    <div class="metric-name">💹 総合ROAS</div>
+    <div class="metric-def">売上 ÷（Meta広告費 + RPP費 + RPP拡張費）× 100。すべての広告費に対して何%の売上が生まれたかを示す最重要指標。</div>
+    <div class="metric-badges">
+      <span class="badge good">✅ 目標値以上：良好</span>
+      <span class="badge warn">⚠️ 目標値の50%〜：要注意</span>
+      <span class="badge bad">❌ 目標値の50%未満：要改善</span>
+    </div>
+  </div>
+
+  <div class="metric">
+    <div class="metric-name">📣 Meta ROAS</div>
+    <div class="metric-def">売上 ÷ Meta広告費 × 100。インスタ広告だけの費用対効果。</div>
+    <div class="metric-badges">
+      <span class="badge info">相関分析タブで確認できます</span>
+    </div>
+  </div>
+
+  <div class="metric">
+    <div class="metric-name">📦 楽天広告 ROAS</div>
+    <div class="metric-def">売上 ÷（RPP費 + RPP拡張費）× 100。楽天内広告だけの費用対効果。</div>
+    <div class="metric-badges">
+      <span class="badge info">相関分析タブで確認できます</span>
+    </div>
+  </div>
+
+  <div class="tip">⚙️ <strong>目標ROASは変更できます。</strong>ツールバーの「⚙️ 目標設定」から変更すると、判定カード・グラフ・レポートにすべて反映されます。</div>
+
   <h3>広告（インスタ広告タブ）</h3>
 
   <div class="metric">
     <div class="metric-name">📊 CTR（クリック率）</div>
     <div class="metric-def">広告を見た人のうち、何%がクリックしたか。広告の「訴求力」を示す。</div>
     <div class="metric-badges">
-      <span class="badge good">✅ 1.5%以上：良好</span>
-      <span class="badge warn">⚠️ 1.0〜1.5%：改善余地あり</span>
-      <span class="badge bad">❌ 1.0%未満：要見直し</span>
+      <span class="badge good">✅ 目標値以上：良好</span>
+      <span class="badge warn">⚠️ 目標値の67%〜：改善余地あり</span>
+      <span class="badge bad">❌ 目標値の67%未満：要見直し</span>
     </div>
+    <div style="margin-top:6px;font-size:12px;color:#888;">※ デフォルト目標：1.5%。⚙️ 目標設定から変更可能。</div>
   </div>
 
   <div class="metric">
     <div class="metric-name">💰 CPC（クリック単価）</div>
     <div class="metric-def">1クリックあたりの広告費。低いほど効率的。</div>
     <div class="metric-badges">
-      <span class="badge good">✅ ¥30以下：良好</span>
-      <span class="badge warn">⚠️ ¥30〜¥40：やや高め</span>
-      <span class="badge bad">❌ ¥40超：高コスト</span>
+      <span class="badge good">✅ 目標値以下：良好</span>
+      <span class="badge warn">⚠️ 目標値〜1.33倍：やや高め</span>
+      <span class="badge bad">❌ 目標値の1.33倍超：高コスト</span>
     </div>
+    <div style="margin-top:6px;font-size:12px;color:#888;">※ デフォルト目標：¥30。⚙️ 目標設定から変更可能。</div>
   </div>
 
   <div class="metric">
@@ -282,12 +404,13 @@
 
   <div class="metric">
     <div class="metric-name">📸 Instagram→楽天 流入</div>
-    <div class="metric-def">Instagramから楽天に来た人数。インスタ施策の直接効果を示す最重要指標。</div>
+    <div class="metric-def">Instagramから楽天に来た人数。インスタ施策の直接効果を示す重要指標。</div>
     <div class="metric-badges">
-      <span class="badge good">✅ 月500人以上：目標達成</span>
-      <span class="badge warn">⚠️ 月300〜500人</span>
-      <span class="badge bad">❌ 月300人未満：インスタからの誘導が弱い</span>
+      <span class="badge good">✅ 目標値以上：良好</span>
+      <span class="badge warn">⚠️ 目標値の40%〜：改善余地あり</span>
+      <span class="badge bad">❌ 目標値の40%未満：インスタからの誘導が弱い</span>
     </div>
+    <div style="margin-top:6px;font-size:12px;color:#888;">※ デフォルト目標：月500人。⚙️ 目標設定から変更可能。</div>
   </div>
 
   <h3>グラフの見方</h3>
@@ -305,6 +428,10 @@
         <td>楽天外・楽天内・Instagramの割合。Instagramが増えれば広告・投稿施策が効いている。</td>
       </tr>
       <tr>
+        <td>ROAS推移（相関分析タブ）</td>
+        <td>総合・Meta・楽天広告それぞれのROASの変化。どの広告が効いているかを比較できる。</td>
+      </tr>
+      <tr>
         <td>CTR推移</td>
         <td>広告の訴求力の変化。下がってきたらクリエイティブの見直しタイミング。</td>
       </tr>
@@ -314,6 +441,23 @@
       </tr>
     </tbody>
   </table>
+
+  <div class="tip">📅 <strong>グラフ上の縦線マーカー</strong>はカレンダーに登録したセール・マラソン等のイベントです。売上・ROASの動きとイベントのタイミングを照合してください。</div>
+
+  <h3>相関分析タブの判定カードの見方</h3>
+  <div class="card">
+    <div class="card-title">🟢🟡🔴 判定カード</div>
+    <p>ROAS・CTR・IG流入の3つについて、設定した目標値と比較して自動判定します。</p>
+    <table>
+      <thead><tr><th>色</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td>🟢 緑（良好）</td><td>目標値以上</td></tr>
+        <tr><td>🟡 黄（要注意）</td><td>目標の40〜67%程度</td></tr>
+        <tr><td>🔴 赤（要改善）</td><td>目標の40%未満</td></tr>
+        <tr><td>⚪ グレー</td><td>データなし</td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <h3>レポートの読み方</h3>
   <div class="card">
@@ -329,7 +473,18 @@
     </table>
   </div>
 
-  <div class="tip">📅 <strong>カレンダーと売上の関係を見る</strong>ことが重要です。スーパーSALEやマラソン期間の売上が高い場合、セール依存度が高い可能性があります。平常時の底上げ（定期投稿・広告継続）が中長期の課題です。</div>
+  <div class="card">
+    <div class="card-title">📊 レポートに含まれる内容</div>
+    <table>
+      <thead><tr><th>セクション</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>KPIサマリー</td><td>総合ROAS・Meta ROAS・楽天ROAS・広告費内訳・CTR・CPC・IG流入・全体アクセス等</td></tr>
+        <tr><td>グラフ</td><td>売上推移 / ROAS推移（3種）/ CTR推移 / CPC推移</td></tr>
+        <tr><td>自動インサイト</td><td>データから気づいた点・次にやること</td></tr>
+        <tr><td>日別データ一覧</td><td>直近14件の CTR・CPC・売上・Meta費・RPP費・ROAS</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- ===== FAQ ===== -->
@@ -342,10 +497,21 @@
   <details class="faq">
     <summary>CSVを取り込んだのに数字が入らない</summary>
     <div class="faq-body">
-      ファイルの文字コードや形式が異なる可能性があります。<br>
-      ・Meta広告CSVは「広告」タブ → 内訳 → 時間 → 日 でダウンロードしたものを使ってください<br>
-      ・楽天RMSのCSVは「6 データダウンロード → 店舗データ → 日次」からダウンロードしてください<br>
+      ファイルの種類・ダウンロード元が異なる可能性があります。<br><br>
+      ・<strong>Meta広告CSV</strong>：広告マネージャ → キャンペーン → 内訳 → 時間 → 日 でダウンロード<br>
+      ・<strong>楽天RMS CSV</strong>：6 データダウンロード → 店舗データ → 日次<br>
+      ・<strong>RPP CSV</strong>：広告 → RPP → レポート → CSV<br>
+      ・<strong>RPP-EXP CSV</strong>：広告 → RPP拡張 → レポート → CSV<br><br>
       別の画面からダウンロードしたCSVは対応していない場合があります。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>RPP CSVとRPP-EXP CSVはどこで取り込む？</summary>
+    <div class="faq-body">
+      「相関分析」タブを開くと、右上に <strong>📥 RPP CSV</strong> と <strong>📥 RPP-EXP CSV</strong> ボタンがあります。<br>
+      それぞれ対応するCSVを選択するだけで自動取込されます。<br><br>
+      取り込むと総合ROASの計算に反映されます（Meta費 + RPP費 + RPP-EXP費 の合計で計算）。
     </div>
   </details>
 
@@ -381,10 +547,30 @@
   <details class="faq">
     <summary>開いたときにデータが消えている</summary>
     <div class="faq-body">
-      データはブラウザのlocalStorageに保存されています。<br>
-      ・別のブラウザで開いた場合はデータが見えません<br>
-      ・ブラウザの「閲覧データを削除」をするとデータが消えます<br>
-      必ず同じPC・同じブラウザで開くようにしてください。
+      データはクラウド（Firebase）に保存されているため、通常は消えません。<br>
+      以下を確認してください：<br>
+      ・インターネットに接続されているか<br>
+      ・ブラウザで「このサイトをブロック」などの設定になっていないか<br>
+      ・ページをリロードして再度確認する<br><br>
+      それでも表示されない場合は管理者に連絡してください。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>目標値を変えたい</summary>
+    <div class="faq-body">
+      ツールバー右上の <strong>⚙️ 目標設定</strong> ボタンを押すと設定モーダルが開きます。<br>
+      ROAS・CTR・CPC・IG流入の目標値を変更して「保存する」を押してください。<br>
+      設定はクラウドに保存され、判定カード・グラフの目標ライン・レポートに自動反映されます。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>相関分析タブをスクリーンショットしたい</summary>
+    <div class="faq-body">
+      相関分析タブを開くと、右上に <strong>📸 スクショ</strong> ボタンがあります。<br>
+      押すと、タブ全体（スクロール部分を含む）がPNG画像として自動ダウンロードされます。<br>
+      ファイル名は「相関分析_日付.png」の形式です。
     </div>
   </details>
 
@@ -393,7 +579,8 @@
     <div class="faq-body">
       ページ上部右の「🖨️ レポート印刷」ボタンを押すと新しいウィンドウが開きます。<br>
       ブラウザの印刷機能（Ctrl+P / Cmd+P）でPDFとして保存するか、プリンターで印刷できます。<br>
-      「コメント欄」には印刷前に手書きで補足を記入してください。
+      「コメント欄」には印刷前に手書きで補足を記入してください。<br><br>
+      ※ RPP・RPP-EXPのCSVを取り込んだ後に印刷すると、ROASの詳細内訳もレポートに反映されます。
     </div>
   </details>
 
@@ -410,6 +597,14 @@
     <div class="faq-body">
       「履歴」タブを開く → 該当日の行の「×」ボタンで削除 → 「データを入力する」ボタンで正しいデータを再入力してください。<br>
       CSVを再取り込みする場合も同様に削除してから取り込み直してください。
+    </div>
+  </details>
+
+  <details class="faq">
+    <summary>ダッシュボードで何ができるか一覧を見たい</summary>
+    <div class="faq-body">
+      ツールバーの <strong>📋 できること</strong> ボタンを押すと、機能一覧がモーダルで表示されます。<br>
+      データ入力・ROAS計算・相関分析・目標値設定・レポート印刷の5カテゴリに分けて説明しています。
     </div>
   </details>
 </div>
