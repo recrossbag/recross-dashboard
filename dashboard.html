@@ -314,8 +314,13 @@
   </details>
 
   <!-- ② 予定 -->
-  <div class="section-title">今後の予定</div>
-  <div class="event-list" id="event-list"></div>
+  <details id="events-details" style="margin-top:16px;background:#fff;border:1px solid #EBEBEB;border-radius:10px;overflow:hidden;">
+    <summary id="events-summary" style="padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+      <span>📅 今後の予定 <span id="events-count" style="font-size:11px;color:#aaa;font-weight:400;"></span></span>
+      <span style="font-size:11px;color:#aaa;font-weight:400;">（クリックで開く）</span>
+    </summary>
+    <div id="event-list" style="padding:0 16px 10px;"></div>
+  </details>
 
   <!-- ③ データタブ -->
   <div class="tabs">
@@ -825,9 +830,12 @@ function renderEvents() {
     return null;
   }).filter(Boolean).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
+  const countEl = document.getElementById('events-count');
+  if (countEl) countEl.textContent = items.length > 0 ? `${items.length}件` : '';
+
   list.innerHTML = '';
   if (items.length === 0) {
-    list.innerHTML = '<div class="empty">直近3日以内に開始・終了するイベントはありません</div>';
+    list.innerHTML = '<div style="color:#BDBDBD;font-size:12px;padding:6px 0;">直近3日以内に開始・終了するイベントはありません</div>';
     return;
   }
 
@@ -846,10 +854,11 @@ function renderEvents() {
     const dateLabel = type === 'start' ? ev.start : (ev.end || ev.start);
 
     const div = document.createElement('div');
-    div.className = 'event-item';
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F5F5F5;font-size:12px;';
     div.innerHTML = `
-      <div class="event-date">${dateLabel}</div>
-      <div class="event-name">${icon} ${ev.title}${badge}</div>
+      <span style="color:#7986CB;font-weight:700;white-space:nowrap;min-width:54px;">${dateLabel.slice(5)}</span>
+      <span style="flex:1;color:#333;">${icon} ${ev.title}</span>
+      ${badge}
     `;
     list.appendChild(div);
   });
