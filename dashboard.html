@@ -366,6 +366,16 @@
       <h3>クリック数・インプレッション<span class="tip" data-tip="棒グラフ（左軸）：広告クリック数。折れ線（右軸）：広告が表示された回数（インプレッション）。出所：Meta広告マネージャ CSV">?</span></h3>
       <canvas id="chart-clicks" height="80"></canvas>
     </div>
+    <!-- 広告予算管理 -->
+    <div class="data-table-section" id="ad-budget-section">
+      <div class="data-table-header">
+        <h3 style="margin:0">💰 広告予算管理</h3>
+        <span style="font-size:11px;color:#888;">「広告」を含むカレンダーイベントを自動取得</span>
+      </div>
+      <div id="ad-budget-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
+      <div id="ad-budget-events"></div>
+    </div>
+
     <div class="data-table-section" id="ad-table-section">
       <div class="data-table-header">
         <h3 style="margin:0">📋 データ一覧</h3>
@@ -727,6 +737,7 @@ const DATA_DOC = db.collection('dashboard').doc('main');
 let entries = [];
 let events  = [];
 let calEventsCache = [];
+let adBudgetsCache = {};
 let charts  = {};
 let dbReady = false;
 
@@ -738,6 +749,10 @@ function saveEvents(arr) {
   events = arr;
   DATA_DOC.set({ events: arr }, { merge: true });
 }
+function saveAdBudgets(obj) {
+  adBudgetsCache = obj;
+  DATA_DOC.set({ adBudgets: obj }, { merge: true });
+}
 
 // Firestore リアルタイムリスナー
 DATA_DOC.onSnapshot(doc => {
@@ -748,7 +763,8 @@ DATA_DOC.onSnapshot(doc => {
   }
   entries        = data.entries        || [];
   events         = data.events         || [];
-  calEventsCache = data.calEvents      || [];
+  calEventsCache  = data.calEvents    || [];
+  adBudgetsCache  = data.adBudgets   || {};
   customCatColors = data.catColors   || {};
   titleColors     = data.titleColors || {};
   applyCatColorToLegend();
@@ -807,9 +823,21 @@ function init() {
 function renderEvents() {
   const list = document.getElementById('event-list');
   const today = new Date(); today.setHours(0,0,0,0);
-  // 今日以降のみ表示
-  const sorted = [...events]
-    .filter(ev => { const d = new Date(ev.date); d.setHours(0,0,0,0); return d >= today; })
+  const todayStr = toDateStr(today);
+
+  // 旧eventsと、カレンダーイベント（calEventsCache）を統合して表示
+  const calItems = loadCalEvents()
+    .filter(ev => ev.end >= todayStr)
+    .map(ev => ({ id: ev.id, date: ev.start, name: ev.title, fromCal: true }));
+
+  const oldItems = events
+    .filter(ev => ev.date >= todayStr)
+    .map(ev => ({ ...ev, fromCal: false }));
+
+  // 同タイトル・同日の重複を除外しつつ日付順でソート
+  const seen = new Set();
+  const sorted = [...oldItems, ...calItems]
+    .filter(ev => { const k = ev.date + ev.name; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a,b) => a.date.localeCompare(b.date));
 
   list.innerHTML = '';
@@ -829,7 +857,9 @@ function renderEvents() {
     div.innerHTML = `
       <div class="event-date">${ev.date}</div>
       <div class="event-name">${ev.name}${badge}</div>
-      <button class="event-del" onclick="deleteEvent('${ev.id}')">×</button>
+      ${ev.fromCal
+        ? `<button class="event-del" onclick="deleteCalEvent('${ev.id}')">×</button>`
+        : `<button class="event-del" onclick="deleteEvent('${ev.id}')">×</button>`}
     `;
     list.appendChild(div);
   });
@@ -1324,6 +1354,145 @@ function renderAll() {
   renderKPIs();
   renderCharts();
   renderHistory();
+  renderAdBudget();
+}
+
+// ─────────────────────────────────────────────
+// 広告予算管理
+// ─────────────────────────────────────────────
+function getDateRange(start, end) {
+  const dates = [];
+  const cur = new Date(start + 'T00:00:00');
+  const last = new Date(end + 'T00:00:00');
+  while (cur <= last) {
+    dates.push(toDateStr(new Date(cur)));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+function updateAdBudget(eventId, date, value) {
+  const obj = JSON.parse(JSON.stringify(adBudgetsCache));
+  if (!obj[eventId]) obj[eventId] = {};
+  const v = parseInt(value);
+  if (value === '' || isNaN(v)) {
+    delete obj[eventId][date];
+    if (Object.keys(obj[eventId]).length === 0) delete obj[eventId];
+  } else {
+    obj[eventId][date] = v;
+  }
+  saveAdBudgets(obj);
+  // サマリーだけ再計算（入力欄はそのまま）
+  updateAdBudgetSummary();
+}
+
+function updateAdBudgetSummary() {
+  const adEvents = calEventsCache.filter(ev => ev.title && ev.title.includes('広告'));
+  let totalPlan = 0, totalActual = 0;
+  adEvents.forEach(ev => {
+    const dates = getDateRange(ev.start, ev.end);
+    dates.forEach(date => {
+      totalPlan   += adBudgetsCache[ev.id]?.[date] || 0;
+      totalActual += Number(entries.find(e => e.date === date)?.budget) || 0;
+    });
+  });
+  const rem = totalPlan - totalActual;
+  document.getElementById('ad-budget-summary').innerHTML = `
+    <div style="background:#F5F5F5;border-radius:8px;padding:12px 14px;">
+      <div style="font-size:11px;color:#888;margin-bottom:4px;">計画予算 合計</div>
+      <div style="font-size:20px;font-weight:700;color:#1565C0;">¥${totalPlan.toLocaleString()}</div>
+    </div>
+    <div style="background:#F5F5F5;border-radius:8px;padding:12px 14px;">
+      <div style="font-size:11px;color:#888;margin-bottom:4px;">実績（Meta CSV）</div>
+      <div style="font-size:20px;font-weight:700;">¥${totalActual.toLocaleString()}</div>
+    </div>
+    <div style="background:#F5F5F5;border-radius:8px;padding:12px 14px;">
+      <div style="font-size:11px;color:#888;margin-bottom:4px;">残予算</div>
+      <div style="font-size:20px;font-weight:700;color:${rem >= 0 ? '#43A047' : '#E53935'};">¥${rem.toLocaleString()}</div>
+    </div>
+  `;
+}
+
+function renderAdBudget() {
+  const summaryEl = document.getElementById('ad-budget-summary');
+  const eventsEl  = document.getElementById('ad-budget-events');
+  if (!summaryEl || !eventsEl) return;
+
+  const adEvents = calEventsCache
+    .filter(ev => ev.title && ev.title.includes('広告'))
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  if (adEvents.length === 0) {
+    summaryEl.innerHTML = '';
+    eventsEl.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px;font-size:12px;">カレンダーに「広告」を含むイベントがありません。<br>カレンダータブでイベントタイトルに「広告」を含めて登録してください。</p>';
+    return;
+  }
+
+  updateAdBudgetSummary();
+
+  eventsEl.innerHTML = adEvents.map(ev => {
+    const dates = getDateRange(ev.start, ev.end);
+    let evPlan = 0, evActual = 0;
+
+    const rows = dates.map(date => {
+      const planned = adBudgetsCache[ev.id]?.[date] ?? '';
+      const actual  = Number(entries.find(e => e.date === date)?.budget) || 0;
+      evPlan   += Number(planned) || 0;
+      evActual += actual;
+      const diff = planned !== '' ? (Number(planned) - actual) : null;
+      const diffStr   = diff === null ? '—' : (diff >= 0 ? '+¥' : '-¥') + Math.abs(diff).toLocaleString();
+      const diffColor = diff === null ? '#aaa' : (diff >= 0 ? '#43A047' : '#E53935');
+      return `<tr style="border-bottom:1px solid #F0F0F0;">
+        <td style="padding:7px 10px;font-size:12px;">${date}</td>
+        <td style="padding:7px 10px;text-align:right;">
+          <input type="number" min="0" step="500"
+            value="${planned}"
+            placeholder="—"
+            onchange="updateAdBudget('${ev.id}','${date}',this.value)"
+            style="width:100px;border:1px solid #E0E0E0;border-radius:6px;padding:4px 8px;font-size:12px;text-align:right;outline:none;"
+            onfocus="this.style.borderColor='#2D2D2D'" onblur="this.style.borderColor='#E0E0E0'">
+        </td>
+        <td style="padding:7px 10px;text-align:right;font-size:12px;">${actual > 0 ? '¥'+actual.toLocaleString() : '—'}</td>
+        <td style="padding:7px 10px;text-align:right;font-size:12px;color:${diffColor};">${diffStr}</td>
+      </tr>`;
+    }).join('');
+
+    const color = ev.color || '#888';
+    const evRem = evPlan - evActual;
+    return `<div style="margin-bottom:14px;border:1px solid #EBEBEB;border-radius:10px;overflow:hidden;">
+      <div style="background:#F9F9F9;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #EBEBEB;flex-wrap:wrap;">
+        <span style="width:10px;height:10px;border-radius:2px;background:${color};display:inline-block;flex-shrink:0;"></span>
+        <span style="font-weight:700;font-size:13px;">${ev.title}</span>
+        <span style="font-size:11px;color:#888;">${ev.start} 〜 ${ev.end}（${dates.length}日間）</span>
+        <span style="margin-left:auto;font-size:12px;color:#555;">
+          計画 <strong style="color:#1565C0;">¥${evPlan.toLocaleString()}</strong>
+          実績 <strong>¥${evActual.toLocaleString()}</strong>
+          残 <strong style="color:${evRem >= 0 ? '#43A047' : '#E53935'};">¥${evRem.toLocaleString()}</strong>
+        </span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#F5F5F5;">
+            <th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:600;color:#666;border-bottom:1px solid #E8E8E8;">日付</th>
+            <th style="padding:6px 10px;text-align:right;font-size:11px;font-weight:600;color:#666;border-bottom:1px solid #E8E8E8;">計画予算（¥）</th>
+            <th style="padding:6px 10px;text-align:right;font-size:11px;font-weight:600;color:#666;border-bottom:1px solid #E8E8E8;">実績（¥）</th>
+            <th style="padding:6px 10px;text-align:right;font-size:11px;font-weight:600;color:#666;border-bottom:1px solid #E8E8E8;">差額</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr style="background:#FAFAFA;border-top:2px solid #E0E0E0;">
+            <td style="padding:8px 10px;font-size:12px;font-weight:700;">合計</td>
+            <td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;color:#1565C0;">¥${evPlan.toLocaleString()}</td>
+            <td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;">¥${evActual.toLocaleString()}</td>
+            <td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:700;color:${evRem >= 0 ? '#43A047' : '#E53935'};">
+              ${evPlan > 0 ? (evRem >= 0 ? '+' : '') + '¥' + evRem.toLocaleString() : '—'}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }).join('');
 }
 
 // ─────────────────────────────────────────────
