@@ -1421,7 +1421,7 @@ function renderAdBudget() {
   if (!summaryEl || !eventsEl) return;
 
   const adEvents = calEventsCache
-    .filter(ev => ev.title && ev.title.includes('広告'))
+    .filter(ev => ev.cat === 'ad' && ev.start && ev.end)
     .sort((a, b) => a.start.localeCompare(b.start));
 
   if (adEvents.length === 0) {
