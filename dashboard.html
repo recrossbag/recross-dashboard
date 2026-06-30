@@ -1522,7 +1522,6 @@ function parseRakutenCSV(text) {
   // 区切り文字を自動判定（タブ or カンマ）
   const sep = lines[0].includes('\t') ? '\t' : ',';
 
-  // ヘッダー行からカラムインデックスを取得
   function splitLine(line) {
     if (sep === '\t') return line.split('\t').map(f => f.replace(/^"|"$/g,'').trim());
     const fields = []; let cur = '', inQ = false;
@@ -1536,18 +1535,26 @@ function parseRakutenCSV(text) {
     return fields;
   }
 
-  const header = splitLine(lines[0]);
+  // ヘッダー行を自動検出（1行目が免責事項などの場合に対応）
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const f = splitLine(lines[i]);
+    if (f.some(h => h.includes('日付')) && f.some(h => h.includes('売上金額'))) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx < 0) return result;
+
+  const header = splitLine(lines[headerIdx]);
   const colDate    = header.findIndex(h => h.includes('日付'));
   const colDevice  = header.findIndex(h => h.includes('デバイス'));
-  // 列名は部分一致で検索（「売上金額（税込）」などのバリエーションに対応）
   const colSales   = header.findIndex(h => h.includes('売上金額'));
   const colOrders  = header.findIndex(h => h.includes('売上件数'));
   const colVisitors= header.findIndex(h => h.includes('アクセス人数'));
 
-  if (colDate < 0) return result; // 日付列が見つからなければ諦める
-
   // まず「すべて」デバイス行を試みる
-  const dataLines = lines.slice(1).filter(l => l.trim());
+  const dataLines = lines.slice(headerIdx + 1).filter(l => l.trim());
   const hasSumRow = colDevice >= 0 && dataLines.some(l => {
     const f = splitLine(l);
     return (f[colDevice] ?? '').trim() === 'すべて';
