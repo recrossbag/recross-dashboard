@@ -1473,14 +1473,22 @@ function importRakutenCSV(input) {
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
-      const text = e.target.result;
-      const rows = parseRakutenCSV(text);
-      if (rows.length === 0) { alert('有効なデータが見つかりませんでした'); return; }
+      // UTF-8 → Shift-JIS の順で試みる（楽天RMSはどちらもある）
+      let text = new TextDecoder('utf-8').decode(e.target.result);
+      let rows = parseRakutenCSV(text);
+      if (rows.length === 0) {
+        text = new TextDecoder('shift-jis').decode(e.target.result);
+        rows = parseRakutenCSV(text);
+      }
+      if (rows.length === 0) {
+        alert('有効なデータが見つかりませんでした。\n楽天RMS「データダウンロード＞店舗データ」の日別CSVを選択してください。');
+        input.value = '';
+        return;
+      }
       let added = 0, updated = 0;
       rows.forEach(row => {
         const idx = entries.findIndex(en => en.date === row.date);
         if (idx >= 0) {
-          // 売上・アクセス・売上件数だけ上書き（広告・流入データは保持）
           entries[idx].sales    = row.sales;
           entries[idx].visitors = row.visitors;
           entries[idx].orders   = row.orders;
@@ -1490,21 +1498,20 @@ function importRakutenCSV(input) {
           added++;
         }
       });
-      // 修復：日付フォーマット違いの重複をマージ＋空データ行を掃除
       const beforeLen = entries.length;
-      entries = dedupeEntries(entries);          // 2026-6-10 と 2026-06-10 を統合
+      entries = dedupeEntries(entries);
       entries = entries.filter(en => !isEmptyEntry(en));
       const removed = beforeLen - entries.length;
       entries.sort((a,b) => a.date.localeCompare(b.date));
       saveEntries(entries);
       renderAll();
-      alert(`取り込み完了：${added}件追加、${updated}件更新` + (removed > 0 ? `、${removed}件の重複・空データを整理` : '') + `（「すべて」デバイスの日別データ）`);
+      alert(`取り込み完了：${added}件追加、${updated}件更新` + (removed > 0 ? `、${removed}件の重複・空データを整理` : ''));
     } catch(err) {
       alert('CSVの読み込みに失敗しました: ' + err.message);
     }
     input.value = '';
   };
-  reader.readAsText(file, 'UTF-8');
+  reader.readAsArrayBuffer(file);
 }
 
 function parseRakutenCSV(text) {
@@ -1532,26 +1539,53 @@ function parseRakutenCSV(text) {
   const header = splitLine(lines[0]);
   const colDate    = header.findIndex(h => h.includes('日付'));
   const colDevice  = header.findIndex(h => h.includes('デバイス'));
-  const colSales   = header.findIndex(h => h === '売上金額');
-  const colOrders  = header.findIndex(h => h === '売上件数');
-  const colVisitors= header.findIndex(h => h === 'アクセス人数');
+  // 列名は部分一致で検索（「売上金額（税込）」などのバリエーションに対応）
+  const colSales   = header.findIndex(h => h.includes('売上金額'));
+  const colOrders  = header.findIndex(h => h.includes('売上件数'));
+  const colVisitors= header.findIndex(h => h.includes('アクセス人数'));
 
-  for (const line of lines.slice(1)) {
-    if (!line.trim()) continue;
+  if (colDate < 0) return result; // 日付列が見つからなければ諦める
+
+  // まず「すべて」デバイス行を試みる
+  const dataLines = lines.slice(1).filter(l => l.trim());
+  const hasSumRow = colDevice >= 0 && dataLines.some(l => {
+    const f = splitLine(l);
+    return (f[colDevice] ?? '').trim() === 'すべて';
+  });
+
+  // 日付ごとに集計するマップ
+  const byDate = {};
+
+  for (const line of dataLines) {
     const fields = splitLine(line);
     const dateStr = (fields[colDate] ?? '').replace(/\//g,'-').replace(/"/g,'');
     if (!/^\d{4}-\d{1,2}-\d{1,2}/.test(dateStr)) continue;
-    const device = colDevice >= 0 ? (fields[colDevice] ?? '') : '';
-    if (colDevice >= 0 && device !== 'すべて') continue;
-    const salesRaw  = (fields[colSales]   ?? '').replace(/,/g,'');
-    const accessRaw = (fields[colVisitors]?? '').replace(/,/g,'');
+
+    // デバイスフィルタ：「すべて」行がある場合はそれだけ、ない場合は全行を合算
+    if (colDevice >= 0) {
+      const device = (fields[colDevice] ?? '').trim();
+      if (hasSumRow && device !== 'すべて') continue;
+    }
+
+    const salesRaw  = colSales   >= 0 ? (fields[colSales]   ?? '').replace(/,/g,'') : '';
+    const accessRaw = colVisitors >= 0 ? (fields[colVisitors]?? '').replace(/,/g,'') : '';
     if (salesRaw === '' && accessRaw === '') continue;
-    const dateNorm = dateStr.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_,y,m,d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
-    const sales    = Number(salesRaw)  || 0;
-    const visitors = Number(accessRaw) || 0;
-    const orders   = Number((fields[colOrders] ?? '').replace(/,/g,'')) || 0;
-    result.push({ date: dateNorm, sales, visitors, orders });
+
+    const dateNorm = dateStr.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_,y,m,d) =>
+      `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
+    const sales   = Number(salesRaw)  || 0;
+    const visitors= Number(accessRaw) || 0;
+    const orders  = colOrders >= 0 ? (Number((fields[colOrders] ?? '').replace(/,/g,'')) || 0) : 0;
+
+    if (!byDate[dateNorm]) byDate[dateNorm] = { sales:0, visitors:0, orders:0 };
+    byDate[dateNorm].sales    += sales;
+    byDate[dateNorm].visitors += visitors;
+    byDate[dateNorm].orders   += orders;
   }
+
+  Object.keys(byDate).sort().forEach(date => {
+    result.push({ date, ...byDate[date] });
+  });
   return result;
 }
 
