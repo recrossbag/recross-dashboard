@@ -1389,7 +1389,7 @@ function updateAdBudget(eventId, date, value) {
 }
 
 function updateAdBudgetSummary() {
-  const adEvents = calEventsCache.filter(ev => ev.cat === 'ad');
+  const adEvents = calEventsCache.filter(ev => ev.cat === 'ad' && ev.start && ev.end);
   let totalPlan = 0, totalActual = 0;
   adEvents.forEach(ev => {
     const dates = getDateRange(ev.start, ev.end);
@@ -1426,7 +1426,7 @@ function renderAdBudget() {
 
   if (adEvents.length === 0) {
     summaryEl.innerHTML = '';
-    eventsEl.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px;font-size:12px;">カレンダーに「📣 広告」カテゴリのイベントがありません。<br>カレンダータブでイベント追加時にカテゴリを「広告」に設定してください。</p>';
+    eventsEl.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px;font-size:12px;">カレンダーに「📣 広告」カテゴリのイベントがありません。<br>カレンダータブでイベント追加時にカテゴリを「📣 広告」に設定してください。</p>';
     return;
   }
 
