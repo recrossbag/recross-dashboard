@@ -370,7 +370,7 @@
     <div class="data-table-section" id="ad-budget-section">
       <div class="data-table-header">
         <h3 style="margin:0">💰 広告予算管理</h3>
-        <span style="font-size:11px;color:#888;">「広告」を含むカレンダーイベントを自動取得</span>
+        <span style="font-size:11px;color:#888;">📣 広告カテゴリのイベントを自動取得</span>
       </div>
       <div id="ad-budget-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
       <div id="ad-budget-events"></div>
@@ -1391,7 +1391,7 @@ function updateAdBudget(eventId, date, value) {
 }
 
 function updateAdBudgetSummary() {
-  const adEvents = calEventsCache.filter(ev => ev.title && ev.title.includes('広告'));
+  const adEvents = calEventsCache.filter(ev => ev.cat === 'ad');
   let totalPlan = 0, totalActual = 0;
   adEvents.forEach(ev => {
     const dates = getDateRange(ev.start, ev.end);
@@ -1428,7 +1428,7 @@ function renderAdBudget() {
 
   if (adEvents.length === 0) {
     summaryEl.innerHTML = '';
-    eventsEl.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px;font-size:12px;">カレンダーに「広告」を含むイベントがありません。<br>カレンダータブでイベントタイトルに「広告」を含めて登録してください。</p>';
+    eventsEl.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px;font-size:12px;">カレンダーに「📣 広告」カテゴリのイベントがありません。<br>カレンダータブでイベント追加時にカテゴリを「広告」に設定してください。</p>';
     return;
   }
 
