@@ -826,12 +826,16 @@ function renderEvents() {
   const todayStr = toDateStr(today);
 
   // 旧eventsと、カレンダーイベント（calEventsCache）を統合して表示
+  // 今日〜14日以内に開始するもののみ
+  const limit14 = new Date(today); limit14.setDate(limit14.getDate() + 14);
+  const limit14Str = toDateStr(limit14);
+
   const calItems = loadCalEvents()
-    .filter(ev => ev.end >= todayStr)
+    .filter(ev => ev.start >= todayStr && ev.start <= limit14Str)
     .map(ev => ({ id: ev.id, date: ev.start, name: ev.title, fromCal: true }));
 
   const oldItems = events
-    .filter(ev => ev.date >= todayStr)
+    .filter(ev => ev.date >= todayStr && ev.date <= limit14Str)
     .map(ev => ({ ...ev, fromCal: false }));
 
   // 同タイトル・同日の重複を除外しつつ日付順でソート
@@ -850,7 +854,7 @@ function renderEvents() {
     const diff = Math.floor((evDate - today) / 86400000);
     let badge = '';
     if (diff === 0) badge = '<span class="badge today">本日</span>';
-    else if (diff <= 3) badge = `<span class="badge soon">あと${diff}日</span>`;
+    else if (diff >= 1 && diff <= 3) badge = `<span class="badge soon">あと${diff}日</span>`;
 
     const div = document.createElement('div');
     div.className = 'event-item';
