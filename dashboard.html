@@ -195,7 +195,7 @@
     .gantt-cell { width:26px; min-width:26px; flex-shrink:0; text-align:center; font-size:10px; color:#aaa; padding:4px 0; border-left:1px solid #F5F5F5; box-sizing:border-box; }
     .gantt-cell.sun { color:#E53935; background:#FFF6F6; }
     .gantt-cell.sat { color:#1565C0; background:#F4F8FF; }
-    .gantt-cell.today { background:#FFF8E1; }
+    .gantt-cell.today { background:#FFF0B3; border-left:2px solid #F9A825 !important; color:#E65100 !important; font-weight:700; }
     .gantt-cell .g-dow { font-size:8px; display:block; color:#bbb; }
     .gantt-track { display:flex; position:relative; flex:1; }
     .gantt-track .gantt-cell { padding:0; height:16px; }
@@ -826,16 +826,13 @@ function renderEvents() {
   const todayStr = toDateStr(today);
 
   // 旧eventsと、カレンダーイベント（calEventsCache）を統合して表示
-  // 今日〜14日以内に開始するもののみ
-  const limit14 = new Date(today); limit14.setDate(limit14.getDate() + 14);
-  const limit14Str = toDateStr(limit14);
-
+  // 本日のみ表示
   const calItems = loadCalEvents()
-    .filter(ev => ev.start >= todayStr && ev.start <= limit14Str)
+    .filter(ev => ev.start === todayStr)
     .map(ev => ({ id: ev.id, date: ev.start, name: ev.title, fromCal: true }));
 
   const oldItems = events
-    .filter(ev => ev.date >= todayStr && ev.date <= limit14Str)
+    .filter(ev => ev.date === todayStr)
     .map(ev => ({ ...ev, fromCal: false }));
 
   // 同タイトル・同日の重複を除外しつつ日付順でソート
