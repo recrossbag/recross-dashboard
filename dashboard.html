@@ -570,14 +570,21 @@ function roboTalk() {
       <div>📸 Instagram</div>
       <div>🔍 サーチ</div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
-      <label style="font-size:12px;font-weight:700;white-space:nowrap;">表示日数</label>
-      <select id="ig-days-select" onchange="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 10px;font-size:13px;">
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+      <label style="font-size:12px;font-weight:700;white-space:nowrap;">表示期間</label>
+      <select id="ig-days-select" onchange="onIgPeriodChange()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 10px;font-size:13px;">
         <option value="3">直近3日</option>
         <option value="5">直近5日</option>
         <option value="7" selected>直近7日</option>
         <option value="14">直近14日</option>
+        <option value="30">直近30日</option>
+        <option value="60">直近60日</option>
+        <option value="custom">日付指定…</option>
       </select>
+      <div id="ig-custom-range" style="display:none;display:none;gap:6px;align-items:center;">
+        <input type="date" id="ig-start-date" onchange="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;font-size:13px;">
+        <span style="font-size:12px;color:#888;">〜 今日</span>
+      </div>
     </div>
     <div id="ig-rows"></div>
     <div class="modal-footer">
@@ -1357,11 +1364,11 @@ function saveEntry() {
   };
   if (!entry.date) return alert('日付を入力してください');
 
-  // 同日があれば上書き
+  // 同日があれば上書き（既存フィールドを保持しつつフォーム入力値で更新）
   const idx = entries.findIndex(e => e.date === entry.date);
   if (idx >= 0) {
     if (!confirm('同じ日付のデータがあります。上書きしますか？')) return;
-    entries[idx] = entry;
+    entries[idx] = { ...entries[idx], ...entry }; // extVisitors等を保持
   } else {
     entries.push(entry);
     entries.sort((a,b) => a.date.localeCompare(b.date));
@@ -1610,15 +1617,51 @@ document.getElementById('ig-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('ig-modal')) closeIgModal();
 });
 
-function renderIgRows() {
-  const days = parseInt(document.getElementById('ig-days-select').value);
-  const container = document.getElementById('ig-rows');
+function onIgPeriodChange() {
+  const val = document.getElementById('ig-days-select').value;
+  const customDiv = document.getElementById('ig-custom-range');
+  if (val === 'custom') {
+    customDiv.style.display = 'flex';
+    // デフォルトで30日前をセット
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    const el = document.getElementById('ig-start-date');
+    if (!el.value) el.value = toDateStr(d);
+  } else {
+    customDiv.style.display = 'none';
+  }
+  renderIgRows();
+}
+
+function getIgDateRange() {
+  const val = document.getElementById('ig-days-select').value;
   const today = new Date();
-  const rows = [];
+  if (val === 'custom') {
+    const start = document.getElementById('ig-start-date').value;
+    if (!start) return [];
+    const dates = [];
+    const cur = new Date(start);
+    while (cur <= today) {
+      dates.push(toDateStr(new Date(cur)));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+  const days = parseInt(val);
+  const dates = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = toDateStr(d);
+    dates.push(toDateStr(d));
+  }
+  return dates;
+}
+
+function renderIgRows() {
+  const dates = getIgDateRange();
+  const container = document.getElementById('ig-rows');
+  const rows = [];
+  for (const dateStr of dates) {
+    const d = new Date(dateStr);
     const ex = entries.find(e => e.date === dateStr);
     rows.push({
       dateStr,
@@ -1643,13 +1686,9 @@ function renderIgRows() {
 }
 
 function saveIgEntries() {
-  const days = parseInt(document.getElementById('ig-days-select').value);
-  const today = new Date();
+  const dates = getIgDateRange();
   let saved = 0;
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dateStr = toDateStr(d);
+  for (const dateStr of dates) {
     const getVal = id => { const el = document.getElementById(id); return el?.value !== '' ? Number(el.value) : null; };
     const extVal = getVal(`ext-${dateStr}`);
     const intVal = getVal(`int-${dateStr}`);
