@@ -693,8 +693,10 @@ function roboTalk() {
       <input type="text" id="cal-ev-note" placeholder="例：全商品10%OFF" style="border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:13px;flex:1;">
     </div>
     <div class="modal-footer">
+      <button id="cal-del-btn" onclick="deleteCurrentCalEvent()" style="display:none;background:none;border:1px solid #E53935;color:#E53935;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;">🗑 削除</button>
+      <div style="flex:1;"></div>
       <button class="btn-cancel" onclick="closeCalModal()">キャンセル</button>
-      <button class="btn-save" onclick="saveCalEvent()">追加する</button>
+      <button class="btn-save" id="cal-save-btn" onclick="saveCalEvent()">追加する</button>
     </div>
   </div>
 </div>
@@ -2179,8 +2181,8 @@ function parseMetaCSV(text) {
     const ctr  = v.adImp > 0 ? parseFloat((v.clicks / v.adImp * 100).toFixed(2)) : null;
     const cpc  = v.clicks > 0 ? Math.round(v.budget / v.clicks) : null;
     const freq = v.freqN  > 0 ? parseFloat((v.freqSum / v.freqN).toFixed(2)) : null;
-    result.push({ date, ctr, cpc, clicks: v.clicks, adImp: v.adImp, budget: Math.round(v.budget), freq,
-      reach:null, imp:null, engage:null, saves:null, follower:null, profile:null, sales:null, visitors:null, igVisitors:null });
+    // 広告データのみ（手入力フィールドを上書きしないよう null フィールドは含めない）
+    result.push({ date, ctr, cpc, clicks: v.clicks, adImp: v.adImp, budget: Math.round(v.budget), freq });
   });
   return result;
 }
@@ -2481,6 +2483,16 @@ function deleteCalEvent(id) {
   if (calSelectedDate) renderCalDetail(calSelectedDate);
 }
 
+function deleteCurrentCalEvent() {
+  if (!calEditId) return;
+  if (!confirm('このイベントを削除しますか？')) return;
+  const arr = loadCalEvents().filter(e => e.id !== calEditId);
+  saveCalEvents(arr);
+  closeCalModal();
+  renderCalendar();
+  if (calSelectedDate) renderCalDetail(calSelectedDate);
+}
+
 let calEditId = null;
 
 function editCalEvent(id) {
@@ -2495,12 +2507,16 @@ function editCalEvent(id) {
   document.getElementById('cal-ev-time-end').value   = ev.timeEnd   || '';
   document.getElementById('cal-ev-note').value       = ev.note      || '';
   document.querySelector('#cal-modal h2').textContent = '✏️ イベントを編集';
+  document.getElementById('cal-del-btn').style.display = 'inline-block';
+  document.getElementById('cal-save-btn').textContent = '保存する';
   document.getElementById('cal-modal').style.display = 'flex';
 }
 
 function openCalAddModal() {
   calEditId = null;
   document.querySelector('#cal-modal h2').textContent = '📅 イベントを追加';
+  document.getElementById('cal-del-btn').style.display = 'none';
+  document.getElementById('cal-save-btn').textContent = '追加する';
   document.getElementById('cal-ev-start').value = calSelectedDate || toDateStr(new Date());
   document.getElementById('cal-ev-end').value        = calSelectedDate || toDateStr(new Date());
   document.getElementById('cal-ev-title').value      = '';
