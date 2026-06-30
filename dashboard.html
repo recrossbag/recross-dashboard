@@ -366,16 +366,6 @@
       <h3>クリック数・インプレッション<span class="tip" data-tip="棒グラフ（左軸）：広告クリック数。折れ線（右軸）：広告が表示された回数（インプレッション）。出所：Meta広告マネージャ CSV">?</span></h3>
       <canvas id="chart-clicks" height="80"></canvas>
     </div>
-    <!-- 広告予算管理 -->
-    <div class="data-table-section" id="ad-budget-section">
-      <div class="data-table-header">
-        <h3 style="margin:0">💰 広告予算管理</h3>
-        <span style="font-size:11px;color:#888;">📣 広告カテゴリのイベントを自動取得</span>
-      </div>
-      <div id="ad-budget-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
-      <div id="ad-budget-events"></div>
-    </div>
-
     <div class="data-table-section" id="ad-table-section">
       <div class="data-table-header">
         <h3 style="margin:0">📋 データ一覧</h3>
@@ -737,7 +727,6 @@ const DATA_DOC = db.collection('dashboard').doc('main');
 let entries = [];
 let events  = [];
 let calEventsCache = [];
-let adBudgetsCache = {};
 let charts  = {};
 let dbReady = false;
 
@@ -748,10 +737,6 @@ function saveEntries(arr) {
 function saveEvents(arr) {
   events = arr;
   DATA_DOC.set({ events: arr }, { merge: true });
-}
-function saveAdBudgets(obj) {
-  adBudgetsCache = obj;
-  DATA_DOC.set({ adBudgets: obj }, { merge: true });
 }
 
 // Firestore リアルタイムリスナー
@@ -764,7 +749,6 @@ DATA_DOC.onSnapshot(doc => {
   entries        = data.entries        || [];
   events         = data.events         || [];
   calEventsCache  = data.calEvents    || [];
-  adBudgetsCache  = data.adBudgets   || {};
   customCatColors = data.catColors   || {};
   titleColors     = data.titleColors || {};
   applyCatColorToLegend();
@@ -812,7 +796,6 @@ function init() {
   renderKPIs();
   renderCharts();
   renderHistory();
-  renderAdBudget();
   initCalendar();
 }
 
@@ -1356,209 +1339,6 @@ function renderAll() {
   renderKPIs();
   renderCharts();
   renderHistory();
-  renderAdBudget();
-}
-
-// ─────────────────────────────────────────────
-// 広告予算管理
-// ─────────────────────────────────────────────
-function getDateRange(start, end) {
-  const dates = [];
-  const cur = new Date(start + 'T00:00:00');
-  const last = new Date(end + 'T00:00:00');
-  while (cur <= last) {
-    dates.push(toDateStr(new Date(cur)));
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
-}
-
-function updateAdBudget(eventId, date, value) {
-  const obj = JSON.parse(JSON.stringify(adBudgetsCache));
-  if (!obj[eventId]) obj[eventId] = {};
-  const v = parseInt(value);
-  if (value === '' || isNaN(v)) {
-    delete obj[eventId][date];
-    if (Object.keys(obj[eventId]).length === 0) delete obj[eventId];
-  } else {
-    obj[eventId][date] = v;
-  }
-  saveAdBudgets(obj);
-  // 差額セル・合計セルをピンポイント更新（入力欄リセットを避けるため全再描画しない）
-  const actual = Number(entries.find(e => e.date === date)?.budget) || 0;
-  const plannedVal = isNaN(v) ? null : v;
-  const diffEl = document.getElementById(`ab-diff-${eventId}-${date}`);
-  if (diffEl) {
-    const diff = plannedVal !== null ? plannedVal - actual : null;
-    diffEl.textContent = diff === null ? '—' : (diff >= 0 ? '+¥' : '-¥') + Math.abs(diff).toLocaleString();
-    diffEl.style.color = diff === null ? '#aaa' : diff >= 0 ? '#43A047' : '#E53935';
-  }
-  // イベント合計列更新
-  const ev = calEventsCache.find(e => e.id === eventId);
-  if (ev) {
-    const dates = getDateRange(ev.start, ev.end);
-    let evPlan = 0, evActual = 0;
-    dates.forEach(d => {
-      evPlan   += obj[eventId]?.[d] || 0;
-      evActual += Number(entries.find(e => e.date === d)?.budget) || 0;
-    });
-    const evRem = evPlan - evActual;
-    const setEl = (id, txt, col) => { const el = document.getElementById(id); if (el) { el.textContent = txt; if (col) el.style.color = col; } };
-    setEl(`ab-plan-total-${eventId}`,   '¥' + evPlan.toLocaleString(),   '#1565C0');
-    setEl(`ab-actual-total-${eventId}`, '¥' + evActual.toLocaleString(), null);
-    setEl(`ab-rem-total-${eventId}`,    evPlan > 0 ? (evRem >= 0 ? '+¥' : '-¥') + Math.abs(evRem).toLocaleString() : '—', evRem >= 0 ? '#43A047' : '#E53935');
-    setEl(`ab-hdr-plan-${eventId}`,     '¥' + evPlan.toLocaleString(),   '#1565C0');
-    setEl(`ab-hdr-actual-${eventId}`,   '¥' + evActual.toLocaleString(), null);
-    setEl(`ab-hdr-rem-${eventId}`,      evPlan > 0 ? (evRem >= 0 ? '¥' : '-¥') + Math.abs(evRem).toLocaleString() : '—', evRem >= 0 ? '#43A047' : '#E53935');
-  }
-  updateAdBudgetSummary();
-}
-
-function updateAdBudgetSummary() {
-  const adEvents = calEventsCache.filter(ev => ev.cat === 'ad' && ev.start && ev.end);
-  let totalPlan = 0, totalActual = 0;
-  adEvents.forEach(ev => {
-    const dates = getDateRange(ev.start, ev.end);
-    dates.forEach(date => {
-      totalPlan   += adBudgetsCache[ev.id]?.[date] || 0;
-      totalActual += Number(entries.find(e => e.date === date)?.budget) || 0;
-    });
-  });
-  const rem = totalPlan - totalActual;
-  document.getElementById('ad-budget-summary').innerHTML = `
-    <div style="background:#F5F5F5;border-radius:8px;padding:12px 14px;">
-      <div style="font-size:11px;color:#888;margin-bottom:4px;">計画予算 合計</div>
-      <div style="font-size:20px;font-weight:700;color:#1565C0;">¥${totalPlan.toLocaleString()}</div>
-    </div>
-    <div style="background:#F5F5F5;border-radius:8px;padding:12px 14px;">
-      <div style="font-size:11px;color:#888;margin-bottom:4px;">実績（Meta CSV）</div>
-      <div style="font-size:20px;font-weight:700;">¥${totalActual.toLocaleString()}</div>
-    </div>
-    <div style="background:#F5F5F5;border-radius:8px;padding:12px 14px;">
-      <div style="font-size:11px;color:#888;margin-bottom:4px;">残予算</div>
-      <div style="font-size:20px;font-weight:700;color:${rem >= 0 ? '#43A047' : '#E53935'};">¥${rem.toLocaleString()}</div>
-    </div>
-  `;
-}
-
-function renderAdBudget() {
-  const summaryEl = document.getElementById('ad-budget-summary');
-  const eventsEl  = document.getElementById('ad-budget-events');
-  if (!summaryEl || !eventsEl) return;
-
-  const adEvents = calEventsCache
-    .filter(ev => ev.cat === 'ad' && ev.start && ev.end)
-    .sort((a, b) => a.start.localeCompare(b.start));
-
-  if (adEvents.length === 0) {
-    summaryEl.innerHTML = '';
-    eventsEl.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px;font-size:12px;">カレンダーに「📣 広告」カテゴリのイベントがありません。<br>カレンダータブでイベント追加時にカテゴリを「📣 広告」に設定してください。</p>';
-    return;
-  }
-
-  updateAdBudgetSummary();
-
-  const todayStr = toDateStr(new Date());
-  const DOW = ['日','月','火','水','木','金','土'];
-
-  eventsEl.innerHTML = adEvents.map(ev => {
-    const dates = getDateRange(ev.start, ev.end);
-    const color = ev.color || '#F57C00';
-
-    // 全日付のデータを事前計算
-    const dayData = dates.map(date => {
-      const planned = adBudgetsCache[ev.id]?.[date] ?? '';
-      const actual  = Number(entries.find(e => e.date === date)?.budget) || 0;
-      const plannedNum = Number(planned) || 0;
-      const diff = planned !== '' ? plannedNum - actual : null;
-      return { date, planned, actual, plannedNum, diff };
-    });
-    const evPlan   = dayData.reduce((s, d) => s + d.plannedNum, 0);
-    const evActual = dayData.reduce((s, d) => s + d.actual,     0);
-    const evRem    = evPlan - evActual;
-
-    // 日付ヘッダー列
-    const thCells = dayData.map(({ date }) => {
-      const w = new Date(date + 'T00:00:00').getDay();
-      const isToday = date === todayStr;
-      const bg   = isToday ? 'background:#FFF0B3;border-bottom:2px solid #F9A825;' : w===0 ? 'background:#FFF6F6;' : w===6 ? 'background:#F4F8FF;' : 'background:#FAFAFA;';
-      const col  = isToday ? 'color:#E65100;font-weight:700;' : w===0 ? 'color:#E53935;' : w===6 ? 'color:#1565C0;' : 'color:#888;';
-      const m = Number(date.slice(5,7)), d = Number(date.slice(8,10));
-      return `<th style="min-width:68px;width:68px;padding:5px 2px;text-align:center;font-size:11px;border:1px solid #EBEBEB;${bg}${col}">${m}/${d}<br><span style="font-size:9px;font-weight:400;">${DOW[w]}</span></th>`;
-    }).join('');
-
-    // 計画予算行（入力セル）
-    const planCells = dayData.map(({ date, planned }) => {
-      const isToday = date === todayStr;
-      const bg = isToday ? 'background:#FFFDE7;' : '';
-      return `<td style="padding:3px 3px;text-align:center;border:1px solid #F0F0F0;${bg}">
-        <input type="number" min="0" step="500" value="${planned}" placeholder="—"
-          onchange="updateAdBudget('${ev.id}','${date}',this.value)"
-          style="width:62px;border:1px solid #E0E0E0;border-radius:4px;padding:3px 4px;font-size:11px;text-align:right;outline:none;background:transparent;"
-          onfocus="this.style.borderColor='#2D2D2D'" onblur="this.style.borderColor='#E0E0E0'">
-      </td>`;
-    }).join('');
-
-    // 実績行
-    const actualCells = dayData.map(({ date, actual }) => {
-      const isToday = date === todayStr;
-      const bg = isToday ? 'background:#FFFDE7;' : '';
-      return `<td style="padding:5px 4px;text-align:right;font-size:11px;border:1px solid #F0F0F0;${bg}color:#555;">${actual > 0 ? '¥'+actual.toLocaleString() : '—'}</td>`;
-    }).join('');
-
-    // 差額行
-    const diffCells = dayData.map(({ date, diff }) => {
-      const isToday = date === todayStr;
-      const bg = isToday ? 'background:#FFFDE7;' : '';
-      const txt = diff === null ? '—' : (diff >= 0 ? '+¥' : '-¥') + Math.abs(diff).toLocaleString();
-      const col = diff === null ? '#bbb' : diff >= 0 ? '#43A047' : '#E53935';
-      return `<td id="ab-diff-${ev.id}-${date}" style="padding:5px 4px;text-align:right;font-size:11px;border:1px solid #F0F0F0;${bg}color:${col};">${txt}</td>`;
-    }).join('');
-
-    // 固定列スタイル
-    const stickyTh = 'position:sticky;left:0;z-index:2;background:#FAFAFA;white-space:nowrap;min-width:72px;width:72px;';
-
-    return `<div style="margin-bottom:16px;border:1px solid #EBEBEB;border-radius:10px;overflow:hidden;">
-      <div style="background:#F9F9F9;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #EBEBEB;flex-wrap:wrap;">
-        <span style="width:10px;height:10px;border-radius:2px;background:${color};display:inline-block;flex-shrink:0;"></span>
-        <span style="font-weight:700;font-size:13px;">${ev.title}</span>
-        <span style="font-size:11px;color:#888;">${ev.start} 〜 ${ev.end}（${dates.length}日間）</span>
-        <span style="margin-left:auto;font-size:12px;color:#555;display:flex;gap:12px;flex-wrap:wrap;">
-          計画 <strong id="ab-hdr-plan-${ev.id}" style="color:#1565C0;">¥${evPlan.toLocaleString()}</strong>
-          実績 <strong id="ab-hdr-actual-${ev.id}">¥${evActual.toLocaleString()}</strong>
-          残 <strong id="ab-hdr-rem-${ev.id}" style="color:${evRem >= 0 ? '#43A047' : '#E53935'};">${evPlan > 0 ? (evRem >= 0 ? '¥' : '-¥') + Math.abs(evRem).toLocaleString() : '—'}</strong>
-        </span>
-      </div>
-      <div style="overflow-x:auto;">
-        <table style="border-collapse:collapse;width:max-content;min-width:100%;">
-          <thead>
-            <tr>
-              <th style="${stickyTh}padding:5px 8px;font-size:11px;font-weight:600;color:#666;border:1px solid #EBEBEB;"></th>
-              ${thCells}
-              <th style="min-width:70px;padding:5px 6px;text-align:right;font-size:11px;font-weight:600;color:#666;border:1px solid #EBEBEB;background:#FAFAFA;white-space:nowrap;">合計</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th style="${stickyTh}padding:6px 8px;font-size:11px;font-weight:600;color:#555;border:1px solid #F0F0F0;">計画予算</th>
-              ${planCells}
-              <td id="ab-plan-total-${ev.id}" style="padding:5px 6px;text-align:right;font-size:12px;font-weight:700;color:#1565C0;border:1px solid #F0F0F0;white-space:nowrap;">¥${evPlan.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <th style="${stickyTh}padding:6px 8px;font-size:11px;font-weight:600;color:#555;border:1px solid #F0F0F0;">実績</th>
-              ${actualCells}
-              <td id="ab-actual-total-${ev.id}" style="padding:5px 6px;text-align:right;font-size:12px;font-weight:700;border:1px solid #F0F0F0;white-space:nowrap;">¥${evActual.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <th style="${stickyTh}padding:6px 8px;font-size:11px;font-weight:600;color:#555;border:1px solid #F0F0F0;border-top:2px solid #E0E0E0;">差額</th>
-              ${diffCells}
-              <td id="ab-rem-total-${ev.id}" style="padding:5px 6px;text-align:right;font-size:12px;font-weight:700;border:1px solid #F0F0F0;border-top:2px solid #E0E0E0;white-space:nowrap;color:${evRem >= 0 ? '#43A047' : '#E53935'};">${evPlan > 0 ? (evRem >= 0 ? '+¥' : '-¥') + Math.abs(evRem).toLocaleString() : '—'}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>`;
-  }).join('');
 }
 
 // ─────────────────────────────────────────────
