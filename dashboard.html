@@ -6,6 +6,7 @@
   <title>reCross ダッシュボード</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232D2D2D'/><text x='16' y='23' font-size='18' text-anchor='middle'>🤖</text></svg>">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -195,7 +196,7 @@
     .gantt-cell { width:26px; min-width:26px; flex-shrink:0; text-align:center; font-size:10px; color:#aaa; padding:4px 0; border-left:1px solid #F5F5F5; box-sizing:border-box; }
     .gantt-cell.sun { color:#E53935; background:#FFF6F6; }
     .gantt-cell.sat { color:#1565C0; background:#F4F8FF; }
-    .gantt-cell.today { background:#FFF0B3; border-left:2px solid #F9A825 !important; color:#E65100 !important; font-weight:700; }
+    .gantt-cell.today { background:#FFF8E1; }
     .gantt-cell .g-dow { font-size:8px; display:block; color:#bbb; }
     .gantt-track { display:flex; position:relative; flex:1; }
     .gantt-track .gantt-cell { padding:0; height:16px; }
@@ -232,6 +233,39 @@
     .gantt-group-row:first-child { border-top:none; }
     .gantt-group-label { width:150px; min-width:150px; flex-shrink:0; padding:7px 12px; font-size:12px; font-weight:700; color:#555; border-right:2px solid #E8E8E8; background:#F5F5F5; position:sticky; left:0; z-index:2; display:flex; align-items:center; gap:6px; }
     .gantt-group-fill { flex:1; background:#F5F5F5; }
+
+    /* ── 相関分析：総合判定カード ── */
+    #corr-verdict { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    .verdict-card { background:#fff; border:1px solid #E8E8E8; border-radius:10px; padding:10px 14px; flex:1; min-width:120px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+    .verdict-card.good { border-color:#A5D6A7; background:#F9FBF9; }
+    .verdict-card.warn { border-color:#FFCC80; background:#FFFDF5; }
+    .verdict-card.bad  { border-color:#EF9A9A; background:#FFF5F5; }
+    .verdict-card.na   { border-color:#E0E0E0; background:#FAFAFA; }
+    .verdict-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .verdict-card.good .verdict-dot { background:#43A047; }
+    .verdict-card.warn .verdict-dot { background:#FB8C00; }
+    .verdict-card.bad  .verdict-dot { background:#E53935; }
+    .verdict-card.na   .verdict-dot { background:#BDBDBD; }
+    .verdict-body { display:flex; flex-direction:column; gap:1px; min-width:0; }
+    .verdict-label  { font-size:11px; color:#888; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .verdict-val    { font-size:16px; font-weight:700; color:#212121; line-height:1.2; }
+    .verdict-status { font-size:11px; font-weight:700; }
+    .verdict-card.good .verdict-status { color:#388E3C; }
+    .verdict-card.warn .verdict-status { color:#E65100; }
+    .verdict-card.bad  .verdict-status { color:#C62828; }
+    .verdict-card.na   .verdict-status { color:#9E9E9E; }
+    .verdict-hint   { font-size:10px; color:#BDBDBD; }
+
+    /* ── 相関分析：次にすべきこと ── */
+    .corr-actions-box { background:#fff; border:1px solid #E0E0E0; border-radius:10px; padding:14px 16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+    .corr-actions-title { font-size:13px; font-weight:700; color:#424242; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #F0F0F0; }
+    .corr-action-item { display:flex; gap:8px; padding:6px 0; font-size:13px; line-height:1.5; color:#424242; border-bottom:1px solid #F9F9F9; }
+    .corr-action-item:last-child { border-bottom:none; }
+    .corr-action-icon { flex-shrink:0; width:20px; }
+
+    /* ── 相関分析：カレンダーイベント凡例 ── */
+    .corr-event-legend { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:11px; }
+    .corr-event-badge { padding:2px 8px; border-radius:10px; color:#fff; font-weight:600; font-size:10px; }
   </style>
 </head>
 <body>
@@ -260,7 +294,9 @@
     <button class="entry-btn" onclick="document.getElementById('csv-input').click()" style="margin-top:0;background:#555;padding:10px 18px;font-size:13px;">
       📣 Meta広告 CSV
     </button>
-    <input type="file" id="csv-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="importCSV(this)">
+    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
+    <input type="file" id="rpp-csv-input" accept=".csv" style="display:none" onchange="importRPPCSV(this)">
+    <input type="file" id="rppexp-csv-input" accept=".csv" style="display:none" onchange="importRPPExpCSV(this)">
     <input type="color" id="gantt-title-color-inp" style="display:none" onchange="applyTitleColor(this.value)">
     <!-- IG・サーチ流入 -->
     <button class="entry-btn" onclick="openIgModal()" style="margin-top:0;background:#E64A19;padding:10px 18px;font-size:13px;">
@@ -268,6 +304,14 @@
     </button>
     <!-- 区切り -->
     <div style="flex:1;"></div>
+    <!-- できること -->
+    <button onclick="openChangelog()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 14px;font-size:13px;color:#555;cursor:pointer;" title="できること・更新内容">
+      📋 できること
+    </button>
+    <!-- 目標値設定 -->
+    <button onclick="openSettings()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 14px;font-size:13px;color:#555;cursor:pointer;" title="目標値を設定">
+      ⚙️ 目標設定
+    </button>
     <!-- 印刷 -->
     <button onclick="openReport()" style="margin-top:0;background:none;border:1px solid #CCC;border-radius:8px;padding:9px 16px;font-size:13px;color:#555;cursor:pointer;white-space:nowrap;">
       🖨️ レポート印刷
@@ -315,8 +359,13 @@
   </details>
 
   <!-- ② 予定 -->
-  <div class="section-title">今後の予定</div>
-  <div class="event-list" id="event-list"></div>
+  <details id="events-details" style="margin-top:16px;background:#fff;border:1px solid #EBEBEB;border-radius:10px;overflow:hidden;">
+    <summary id="events-summary" style="padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+      <span>📅 今後の予定 <span id="events-count" style="font-size:11px;color:#aaa;font-weight:400;"></span></span>
+      <span style="font-size:11px;color:#aaa;font-weight:400;">（クリックで開く）</span>
+    </summary>
+    <div id="event-list" style="padding:0 16px 10px;"></div>
+  </details>
 
   <!-- ③ データタブ -->
   <div class="tabs">
@@ -352,7 +401,10 @@
 
   <!-- 広告タブ -->
   <div class="tab-content" id="tab-ad">
-    <div class="kpi-period" id="kpi-ad-period"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
+      <div class="kpi-period" id="kpi-ad-period" style="margin-bottom:0;"></div>
+      <a href="./ig-dashboard.html" target="_blank" title="インスタ担当ダッシュボード" style="font-size:22px;text-decoration:none;line-height:1;">📱</a>
+    </div>
     <div class="kpi-row" id="kpi-ad"></div>
     <div class="chart-wrap">
       <h3>CTR推移（目標：1.5%）<span class="tip" data-tip="クリック率の日別推移。広告を見た人のうちクリックした割合。1.5%以上が目標。出所：Meta広告マネージャ CSV">?</span></h3>
@@ -402,15 +454,28 @@
 
   <!-- 相関分析タブ -->
   <div class="tab-content" id="tab-correlation">
-    <div class="kpi-period" id="kpi-corr-period"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="kpi-period" id="kpi-corr-period" style="margin-bottom:0;"></div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('rpp-csv-input').click()" style="background:#0050B3;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📥 RPP CSV</button>
+        <button onclick="document.getElementById('rppexp-csv-input').click()" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📥 RPP-EXP CSV</button>
+        <button onclick="captureCorrelation(this)" style="background:none;border:1px solid #CCC;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;color:#555;">📸 スクショ</button>
+      </div>
+    </div>
+    <!-- ① 総合判定カード -->
+    <div id="corr-verdict"></div>
+    <!-- ② 次にすべきこと -->
+    <div id="corr-actions"></div>
     <div class="kpi-row" id="kpi-roas"></div>
     <div class="chart-wrap">
       <h3>売上 vs 広告クリック数（2軸）<span class="tip" data-tip="棒グラフ（左軸）：楽天売上。折れ線（右軸）：Meta広告クリック数。広告を強化した日の数日後に売上が上がっているか確認するためのグラフ。出所：楽天RMS CSV＋Meta広告 CSV">?</span></h3>
       <canvas id="chart-sales-vs-clicks" height="80"></canvas>
+      <div class="corr-event-legend" id="legend-sales-vs-clicks"></div>
     </div>
     <div class="chart-wrap">
       <h3>ROAS推移（売上 ÷ 広告費）<span class="tip" data-tip="ROAS（ロアス）＝広告費対売上比率。広告1円あたり何円売れたかを示す。1000%＝10倍の売上。広告費¥100未満の日は除外。出所：楽天RMS CSV＋Meta広告 CSV">?</span></h3>
       <canvas id="chart-roas" height="80"></canvas>
+      <div class="corr-event-legend" id="legend-roas"></div>
     </div>
     <div class="chart-wrap">
       <h3>IG流入 vs 売上（散布図）<span class="tip tip-left" data-tip="横軸：IG→楽天への流入人数。縦軸：その日の売上。点が右上に集まるほどIGからの流入が売上に結びついていることを示す。IG流入データを手入力で蓄積するほど精度が上がります。">?</span></h3>
@@ -530,14 +595,51 @@
 </style>
 <script>
 const roboLines = [
+  // 日常・入力
   'データ入力、忘れずに！📊',
+  '昨日のデータ、もう入れた？🗓️',
+  '週に一回、まとめ入力もOKですよ〜',
+  'CSVインポート、使ってみた？📥',
+  'お疲れさまです！☕',
+  '今日もよろしくです🤖',
+  'ゆっくり確認していきましょ✨',
+  '週末もお仕事ですか？頭が下がります🙇',
+
+  // 広告
   'CTR確認しましたか？🎯',
+  '広告予算、チェックしよう💰',
+  'CPCが高い日は入札調整の見せ時かも',
+  'ROASが下がってたら予算より先にクリエイティブを疑って',
+  'Meta広告、フリークエンシー上がってない？👀',
+  'RPPのROASもチェックしてみて📦',
+  'RPP-EXPはキーワード拡張型だから別管理が吉',
+  'インスタのストーリーズ広告、試してみる価値あるかも',
+
+  // 売上・楽天
   '売上グラフ、右肩上がり目指そう📈',
+  'Instagram流入、増えてる？📸',
   '楽天マラソン、準備はOK？🏃',
   'クーポン設定、確認した？🎫',
-  '広告予算、チェックしよう💰',
-  'Instagram流入、増えてる？📸',
-  'お疲れさまです！☕',
+  'スーパーSALE前は在庫確認も忘れずに📦',
+  'レビュー返信、たまってない？⭐',
+  'ご愛顧感謝デーは流入が跳ねやすい日ですよ',
+  'セール期間中はCPCが上がりやすいから注意',
+  '商品ページのCVR、定期的に見直すと効くよ',
+
+  // 分析・気づき
+  '相関分析タブ、最近見た？🔍',
+  'イベントと売上の関係、グラフで見てみて',
+  'CTRは高いのに売上が伸びてないなら商品ページが鍵かも',
+  'IG流入が多い日、何を投稿してたか振り返ってみて📸',
+  'アクセスが多い日に売上が伸びてないならCVRを疑って',
+  '目標ROAS、現実に合わせて調整してみて⚙️',
+
+  // やさしい
+  '完璧なデータじゃなくていい、入れることが大事！',
+  '数字は嘘をつかない、でも解釈はいつも人間がするもの',
+  'わからないことあったら気軽にクリックしてね🤖',
+  'たまには画面から離れて休憩も大事ですよ☕',
+  'レポート印刷、月1回の習慣にすると振り返りが捗るよ🖨️',
 ];
 let roboTimer;
 function roboTalk() {
@@ -561,7 +663,7 @@ function roboTalk() {
     <h2>📅 アクセス・流入まとめ入力</h2>
     <p style="font-size:11px;color:#888;margin-bottom:4px;">楽天RMS「参照元・検索キーワード分析」→ エリアを切り替えて確認</p>
     <div style="font-size:10px;color:#aaa;margin-bottom:10px;line-height:1.6;">
-      楽天外：エリア「楽天市場外」のみON ／ 楽天内：エリア「楽天市場内」のみON ／ IG・サーチ：参照元テーブルの数字
+      楽天外：エリア「楽天市場外」のみON ／ 楽天内：エリア「楽天市場内（店舗外）」のみON ／ IG・サーチ：参照元テーブルの数字
     </div>
     <div style="display:grid;grid-template-columns:64px 1fr 1fr 1fr 1fr;gap:4px;margin-bottom:6px;font-size:10px;font-weight:700;color:#888;text-align:center;">
       <div style="text-align:left;">日付</div>
@@ -571,22 +673,23 @@ function roboTalk() {
       <div>🔍 サーチ</div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
-      <label style="font-size:12px;font-weight:700;white-space:nowrap;">表示期間</label>
-      <select id="ig-days-select" onchange="onIgPeriodChange()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 10px;font-size:13px;">
+      <label style="font-size:12px;font-weight:700;white-space:nowrap;">表示日数</label>
+      <select id="ig-days-select" onchange="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 10px;font-size:13px;">
         <option value="3">直近3日</option>
         <option value="5">直近5日</option>
         <option value="7" selected>直近7日</option>
         <option value="14">直近14日</option>
         <option value="30">直近30日</option>
         <option value="60">直近60日</option>
-        <option value="custom">日付指定…</option>
+        <option value="custom">📅 日付を指定</option>
       </select>
-      <div id="ig-custom-range" style="display:none;display:none;gap:6px;align-items:center;">
-        <input type="date" id="ig-start-date" onchange="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;font-size:13px;">
-        <span style="font-size:12px;color:#888;">〜 今日</span>
+      <div id="ig-custom-date-wrap" style="display:none;gap:6px;align-items:center;">
+        <label style="font-size:12px;font-weight:700;white-space:nowrap;color:#888;">開始日</label>
+        <input type="date" id="ig-custom-start" oninput="renderIgRows()" style="border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;font-size:13px;">
+        <label style="font-size:12px;font-weight:700;white-space:nowrap;color:#888;">〜 今日</label>
       </div>
     </div>
-    <div id="ig-rows"></div>
+    <div id="ig-rows" style="max-height:380px;overflow-y:auto;"></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeIgModal()">キャンセル</button>
       <button class="btn-save" onclick="saveIgEntries()">まとめて保存</button>
@@ -708,6 +811,107 @@ function roboTalk() {
   </div>
 </div>
 
+<!-- 📋 できること・更新内容モーダル -->
+<div class="modal-overlay" id="changelog-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:520px;max-height:80vh;overflow-y:auto;">
+    <h2>📋 このダッシュボードでできること</h2>
+    <div style="font-size:12px;color:#888;margin:-8px 0 16px;">最終更新：2026年6月</div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;font-size:13px;line-height:1.7;">
+
+      <div style="background:#F8F9FF;border-radius:10px;padding:12px 14px;">
+        <div style="font-weight:700;margin-bottom:6px;">📊 データ入力・管理</div>
+        <ul style="margin:0;padding-left:18px;color:#444;">
+          <li>楽天RMS CSVを読み込んで売上・アクセス・IG流入を一括登録</li>
+          <li>Meta広告CSVで広告費・CTR・CPCを自動取り込み</li>
+          <li>RPP CSV・RPP-EXP CSVで楽天広告費を取り込み</li>
+          <li>手入力フォームでデータを1件ずつ登録・編集</li>
+          <li>カレンダーにセール・マラソン等のイベントを登録</li>
+        </ul>
+      </div>
+
+      <div style="background:#F1F8E9;border-radius:10px;padding:12px 14px;">
+        <div style="font-weight:700;margin-bottom:6px;">💰 ROAS（広告費対効果）</div>
+        <ul style="margin:0;padding-left:18px;color:#444;">
+          <li><b>総合ROAS</b>：Meta + RPP + RPP-EXP の合計広告費で計算</li>
+          <li><b>Meta ROAS</b>：インスタ広告のみの費用対効果</li>
+          <li><b>楽天 ROAS</b>：RPP・RPP拡張のみの費用対効果</li>
+          <li>目標値に対して🟢良好 / 🟡要注意 / 🔴要改善 で色判定</li>
+        </ul>
+      </div>
+
+      <div style="background:#FFF8E1;border-radius:10px;padding:12px 14px;">
+        <div style="font-weight:700;margin-bottom:6px;">🔍 相関分析タブ</div>
+        <ul style="margin:0;padding-left:18px;color:#444;">
+          <li>ROAS・CTR・IG流入の判定カード（目標との比較）</li>
+          <li>データに基づいた自動アクション提案</li>
+          <li>グラフ上にセール・イベントの縦線マーカーを表示</li>
+          <li>📸 ボタンでタブ全体をPNG画像として保存</li>
+        </ul>
+      </div>
+
+      <div style="background:#FCE4EC;border-radius:10px;padding:12px 14px;">
+        <div style="font-weight:700;margin-bottom:6px;">⚙️ 目標値の設定</div>
+        <ul style="margin:0;padding-left:18px;color:#444;">
+          <li>ROAS・CTR・CPC・IG流入の目標値を変更できる</li>
+          <li>設定はクラウドに保存され、次回以降も反映される</li>
+          <li>判定カード・グラフの目標ライン・レポートに自動反映</li>
+        </ul>
+      </div>
+
+      <div style="background:#F3E5F5;border-radius:10px;padding:12px 14px;">
+        <div style="font-weight:700;margin-bottom:6px;">🖨️ レポート印刷</div>
+        <ul style="margin:0;padding-left:18px;color:#444;">
+          <li>今月の総合ROAS・Meta ROAS・楽天ROAS を一覧表示</li>
+          <li>広告費の内訳（Meta / RPP+EXP）を表示</li>
+          <li>ROAS・CTR・CPC のグラフと目標ラインを出力</li>
+          <li>日別データに広告費・ROAS列を追加</li>
+          <li>AIによるインサイト・次にすること を自動生成</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="modal-footer" style="margin-top:20px;">
+      <button class="btn-cancel" onclick="document.getElementById('changelog-modal').classList.remove('open')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⚙️ 目標値設定モーダル -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="max-width:420px;">
+    <h2>⚙️ 目標値の設定</h2>
+    <p style="font-size:12px;color:#888;margin:-8px 0 16px;">変更すると判定カード・グラフの目標ラインに反映されます</p>
+    <div class="date-row" style="margin-bottom:12px;">
+      <label style="width:160px;font-size:13px;">ROAS目標</label>
+      <input type="number" id="set-roas" min="0" step="100" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">%</span>
+    </div>
+    <div class="date-row" style="margin-bottom:12px;">
+      <label style="width:160px;font-size:13px;">CTR目標（Meta広告）</label>
+      <input type="number" id="set-ctr" min="0" step="0.1" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">%</span>
+    </div>
+    <div class="date-row" style="margin-bottom:12px;">
+      <label style="width:160px;font-size:13px;">CPC目標（Meta広告）</label>
+      <input type="number" id="set-cpc" min="0" step="1" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">¥以下</span>
+    </div>
+    <div class="date-row" style="margin-bottom:20px;">
+      <label style="width:160px;font-size:13px;">IG流入目標（月間）</label>
+      <input type="number" id="set-ig" min="0" step="50" style="flex:1;border:1px solid #E0E0E0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:700;">
+      <span style="font-size:13px;color:#666;margin-left:6px;">人</span>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeSettings()" style="padding:9px 20px;border:1px solid #CCC;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">キャンセル</button>
+      <button onclick="saveSettings()" style="padding:9px 20px;border:none;border-radius:8px;background:#26A69A;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">保存する</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
 <script>
 // ─────────────────────────────────────────────
 // Firebase 設定・データ管理
@@ -730,6 +934,9 @@ let calEventsCache = [];
 let charts  = {};
 let dbReady = false;
 
+// ── 目標値設定 ──
+let settings = { targetRoas:1000, targetCtr:1.5, targetCpc:30, targetIg:500 };
+
 function saveEntries(arr) {
   entries = arr;
   DATA_DOC.set({ entries: arr }, { merge: true });
@@ -737,6 +944,49 @@ function saveEntries(arr) {
 function saveEvents(arr) {
   events = arr;
   DATA_DOC.set({ events: arr }, { merge: true });
+}
+function openSettings() {
+  document.getElementById('set-roas').value = settings.targetRoas;
+  document.getElementById('set-ctr').value  = settings.targetCtr;
+  document.getElementById('set-cpc').value  = settings.targetCpc;
+  document.getElementById('set-ig').value   = settings.targetIg;
+  document.getElementById('settings-modal').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+function openChangelog() {
+  document.getElementById('changelog-modal').classList.add('open');
+}
+
+// 相関分析タブのフルスクリーンショット
+function captureCorrelation(btn) {
+  const el = document.getElementById('tab-correlation');
+  const orig = btn.textContent;
+  btn.textContent = '⏳ 処理中…';
+  btn.disabled = true;
+  html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#F7F8FA', scrollY: 0 }).then(canvas => {
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10);
+    a.download = `相関分析_${today}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    btn.textContent = orig;
+    btn.disabled = false;
+  }).catch(() => {
+    alert('スクリーンショットに失敗しました');
+    btn.textContent = orig;
+    btn.disabled = false;
+  });
+}
+function saveSettings() {
+  settings.targetRoas = parseFloat(document.getElementById('set-roas').value) || 1000;
+  settings.targetCtr  = parseFloat(document.getElementById('set-ctr').value)  || 1.5;
+  settings.targetCpc  = parseFloat(document.getElementById('set-cpc').value)  || 30;
+  settings.targetIg   = parseInt(document.getElementById('set-ig').value)     || 500;
+  DATA_DOC.set({ settings }, { merge: true });
+  closeSettings();
+  renderAll();
 }
 
 // Firestore リアルタイムリスナー
@@ -748,9 +998,10 @@ DATA_DOC.onSnapshot(doc => {
   }
   entries        = data.entries        || [];
   events         = data.events         || [];
-  calEventsCache  = data.calEvents    || [];
+  calEventsCache = data.calEvents      || [];
   customCatColors = data.catColors   || {};
   titleColors     = data.titleColors || {};
+  if (data.settings) Object.assign(settings, data.settings);
   applyCatColorToLegend();
   // 自動修復：日付フォーマット重複・空行を一度だけ整理（修復不要なら何もしない＝ループしない）
   if (needsEntryRepair(entries)) {
@@ -807,44 +1058,55 @@ function init() {
 function renderEvents() {
   const list = document.getElementById('event-list');
   const today = new Date(); today.setHours(0,0,0,0);
-  const todayStr = toDateStr(today);
+  const in3 = new Date(today); in3.setDate(in3.getDate() + 3);
 
-  // 旧eventsと、カレンダーイベント（calEventsCache）を統合して表示
-  // 本日のみ表示
-  const calItems = loadCalEvents()
-    .filter(ev => ev.start === todayStr)
-    .map(ev => ({ id: ev.id, date: ev.start, name: ev.title, fromCal: true }));
+  // カレンダーイベントから「開始3日前〜開始当日」または「終了3日前〜終了当日（進行中）」のものを抽出
+  const items = (calEventsCache || []).map(ev => {
+    const start = new Date(ev.start + 'T00:00:00'); start.setHours(0,0,0,0);
+    const end   = new Date((ev.end || ev.start) + 'T00:00:00'); end.setHours(0,0,0,0);
+    const diffStart = Math.floor((start - today) / 86400000); // 開始まで何日
+    const diffEnd   = Math.floor((end   - today) / 86400000); // 終了まで何日
 
-  const oldItems = events
-    .filter(ev => ev.date === todayStr)
-    .map(ev => ({ ...ev, fromCal: false }));
+    // 開始3日前〜開始当日（まだ始まっていない）
+    if (diffStart >= 0 && diffStart <= 3) {
+      return { ev, type: 'start', diff: diffStart, sortKey: ev.start };
+    }
+    // 進行中 かつ 終了まで3日以内
+    if (diffStart < 0 && diffEnd >= 0 && diffEnd <= 3) {
+      return { ev, type: 'end', diff: diffEnd, sortKey: ev.end || ev.start };
+    }
+    return null;
+  }).filter(Boolean).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
-  // 同タイトル・同日の重複を除外しつつ日付順でソート
-  const seen = new Set();
-  const sorted = [...oldItems, ...calItems]
-    .filter(ev => { const k = ev.date + ev.name; if (seen.has(k)) return false; seen.add(k); return true; })
-    .sort((a,b) => a.date.localeCompare(b.date));
+  const countEl = document.getElementById('events-count');
+  if (countEl) countEl.textContent = items.length > 0 ? `${items.length}件` : '';
 
   list.innerHTML = '';
-  if (sorted.length === 0) {
-    list.innerHTML = '<div class="empty">今後の予定はありません</div>';
+  if (items.length === 0) {
+    list.innerHTML = '<div style="color:#BDBDBD;font-size:12px;padding:6px 0;">直近3日以内に開始・終了するイベントはありません</div>';
     return;
   }
-  sorted.forEach(ev => {
-    const evDate = new Date(ev.date); evDate.setHours(0,0,0,0);
-    const diff = Math.floor((evDate - today) / 86400000);
+
+  const CAT_ICON = { rakuten:'🛒', coupon:'🎫', point:'⭐', ad:'📣' };
+
+  items.forEach(({ ev, type, diff }) => {
     let badge = '';
-    if (diff === 0) badge = '<span class="badge today">本日</span>';
-    else if (diff >= 1 && diff <= 3) badge = `<span class="badge soon">あと${diff}日</span>`;
+    if (type === 'start') {
+      if (diff === 0) badge = '<span class="badge today">本日開始</span>';
+      else badge = `<span class="badge soon">開始まであと${diff}日</span>`;
+    } else {
+      if (diff === 0) badge = '<span class="badge today">本日終了</span>';
+      else badge = `<span class="badge soon">終了まであと${diff}日</span>`;
+    }
+    const icon = CAT_ICON[ev.cat] || '📅';
+    const dateLabel = type === 'start' ? ev.start : (ev.end || ev.start);
 
     const div = document.createElement('div');
-    div.className = 'event-item';
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F5F5F5;font-size:12px;';
     div.innerHTML = `
-      <div class="event-date">${ev.date}</div>
-      <div class="event-name">${ev.name}${badge}</div>
-      ${ev.fromCal
-        ? `<button class="event-del" onclick="deleteCalEvent('${ev.id}')">×</button>`
-        : `<button class="event-del" onclick="deleteEvent('${ev.id}')">×</button>`}
+      <span style="color:#7986CB;font-weight:700;white-space:nowrap;min-width:54px;">${dateLabel.slice(5)}</span>
+      <span style="flex:1;color:#333;">${icon} ${ev.title}</span>
+      ${badge}
     `;
     list.appendChild(div);
   });
@@ -909,8 +1171,8 @@ function renderKPIs() {
   const freqVals = P.map(e => e.freq).filter(v => v != null && v !== '');
   const freq = freqVals.length ? freqVals.reduce((s, v) => s + Number(v), 0) / freqVals.length : null;
   document.getElementById('kpi-ad').innerHTML = [
-    kpiCard('CTR（平均）', ctr, 2, '%', '目標 1.5%↑', v => v >= 1.5 ? 'ok' : v >= 1.0 ? 'warn' : 'bad', null, 'クリック率（Click Through Rate）\n広告を見た人のうちクリックした割合。\n計算：クリック数 ÷ インプレッション × 100\n出所：Meta広告マネージャ CSV\n目標：1.5%以上'),
-    kpiCard('CPC（平均）', cpc, 0, '¥', '目標 ¥30↓', v => v <= 30 ? 'ok' : v <= 40 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV\n目標：¥30以下'),
+    kpiCard('CTR（平均）', ctr, 2, '%', `目標 ${settings.targetCtr}%↑`, v => v >= settings.targetCtr ? 'ok' : v >= settings.targetCtr*0.67 ? 'warn' : 'bad', null, 'クリック率（Click Through Rate）\n広告を見た人のうちクリックした割合。\n計算：クリック数 ÷ インプレッション × 100\n出所：Meta広告マネージャ CSV'),
+    kpiCard('CPC（平均）', cpc, 0, '¥', `目標 ¥${settings.targetCpc}↓`, v => v <= settings.targetCpc ? 'ok' : v <= settings.targetCpc*1.33 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
     kpiCard('クリック数（合計）', tClicks, 0, '回', '', null, null, '広告をクリックした回数の合計。\n出所：Meta広告マネージャ CSV'),
     kpiCard('インプレッション（合計）', tImp, 0, '回', '', null, null, '広告が表示された回数の合計。\n同じ人に複数回表示されてもカウント。\n出所：Meta広告マネージャ CSV'),
     kpiCard('消化予算（合計）', tBudget, 0, '¥', '', null, null, '期間中に使用した広告費の合計。\n出所：Meta広告マネージャ CSV'),
@@ -926,19 +1188,30 @@ function renderKPIs() {
     kpiCard('楽天 全体アクセス（合計）', tVis, 0, '人', '', null, null, '楽天市場の店舗ページへのアクセス人数（ユニーク）。\n出所：楽天RMS「データダウンロード＞店舗データ」CSV'),
     kpiCard('転換率（CVR）', cvr, 2, '%', '売上件数÷アクセス', v => v >= 3 ? 'ok' : v >= 1.5 ? 'warn' : 'bad', null, '購入転換率（Conversion Rate）\nアクセスした人のうち実際に購入した割合。\n計算：売上件数 ÷ アクセス人数 × 100\n出所：楽天RMS CSV（楽天CSVを取り込んだ場合のみ表示）'),
     kpiCard('客単価', aov, 0, '¥', '売上÷売上件数', null, null, '1件の注文あたりの平均売上金額。\n計算：売上金額 ÷ 売上件数\n出所：楽天RMS CSV'),
-    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', '月間目標 500人↑', null, null, 'InstagramからQRコードや広告経由で\n楽天ショップに来たアクセス人数。\n出所：楽天RMS「参照元・検索キーワード分析」\nInstagramの行をダッシュボードに手入力'),
+    kpiCard('IG→楽天 流入（合計）', tIg, 0, '人', `月間目標 ${settings.targetIg.toLocaleString()}人↑`, null, null, 'InstagramからQRコードや広告経由で\n楽天ショップに来たアクセス人数。\n出所：楽天RMS「参照元・検索キーワード分析」\nInstagramの行をダッシュボードに手入力'),
   ].join('');
 
-  // ROAS・広告効果KPI（tBudget・tClicksは上の広告KPI計算済みの変数を流用）
-  const roas = (tSales > 0 && tBudget > 0) ? Math.round(tSales / tBudget * 100) : null;
-  const igPerClick = (tClicks > 0 && tIg > 0) ? parseFloat((tIg / tClicks * 100).toFixed(1)) : null;
+  // ROAS・広告効果KPI
+  const tRpp    = sum('rppBudget');
+  const tRppExp = sum('rppExpBudget');
+  const tRakutenAd = tRpp + tRppExp;                  // 楽天広告計（RPP+拡張）
+  const tAllBudget = tBudget + tRakutenAd;             // 総広告費（Meta+楽天）
+  const roasTotal   = (tSales > 0 && tAllBudget > 0)  ? Math.round(tSales / tAllBudget * 100)  : null;
+  const roasMeta    = (tSales > 0 && tBudget > 0)     ? Math.round(tSales / tBudget * 100)     : null;
+  const roasRakuten = (tSales > 0 && tRakutenAd > 0)  ? Math.round(tSales / tRakutenAd * 100)  : null;
+  const igPerClick  = (tClicks > 0 && tIg > 0) ? parseFloat((tIg / tClicks * 100).toFixed(1)) : null;
   const roasEl = document.getElementById('kpi-roas');
   if (roasEl) roasEl.innerHTML = [
-    kpiCard('ROAS', roas, 0, '%', '目標 1000%↑', v => v >= 1000 ? 'ok' : v >= 500 ? 'warn' : 'bad', null, '広告費対売上比率（Return On Ad Spend）\n広告1円あたり何円の売上が得られたか。\n計算：売上金額 ÷ 広告費 × 100\n1000%＝広告費の10倍売れた状態。\n出所：売上（楽天RMS CSV）＋広告費（Meta CSV）'),
-    kpiCard('広告費（合計）', tBudget, 0, '¥', '', null, null, '期間中に使用したMeta（Instagram）広告費の合計。\n出所：Meta広告マネージャ CSV'),
-    kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷広告クリック', null, null, '広告をクリックした人のうち\n実際に楽天ショップへ流入した割合。\n計算：IG→楽天流入数 ÷ 広告クリック数 × 100\n出所：Meta CSV ＋ 楽天RMS手入力'),
-    kpiCard('クリック単価（CPC）', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', '目標¥30↓', v => v <= 30 ? 'ok' : v <= 50 ? 'warn' : 'bad', null, 'クリック単価（Cost Per Click）\n1クリックあたりにかかった広告費。\n計算：消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
+    kpiCard('総合ROAS', roasTotal, 0, '%', `目標 ${settings.targetRoas.toLocaleString()}%↑`, v => v >= settings.targetRoas ? 'ok' : v >= settings.targetRoas*0.5 ? 'warn' : 'bad', null, '総広告費対売上比率\n計算：売上 ÷ (Meta + RPP + RPP拡張) × 100\n全広告を合わせた費用対効果。最も実態に近い数値。\n出所：楽天RMS CSV ＋ Meta CSV ＋ RPP CSV ＋ RPP拡張 CSV'),
+    kpiCard('Meta ROAS', roasMeta, 0, '%', '', v => v >= settings.targetRoas ? 'ok' : v >= settings.targetRoas*0.5 ? 'warn' : 'bad', null, 'Meta（Instagram）広告単体のROAS\n計算：売上 ÷ Meta広告費 × 100\n※楽天広告による売上も含むため参考値'),
+    kpiCard('楽天広告 ROAS', roasRakuten, 0, '%', '', v => v >= settings.targetRoas ? 'ok' : v >= settings.targetRoas*0.5 ? 'warn' : 'bad', null, '楽天広告（RPP+RPP拡張）単体のROAS\n計算：売上 ÷ (RPP+RPP拡張費) × 100\n※Meta広告による売上も含むため参考値'),
+    kpiCard('総広告費', tAllBudget || null, 0, '¥', `Meta:¥${tBudget.toLocaleString()} 楽天:¥${tRakutenAd.toLocaleString()}`, null, null, '全広告費の合計。\nMeta広告費 ＋ RPP費用 ＋ RPP拡張費用。\n出所：Meta CSV ＋ RPP CSV ＋ RPP拡張 CSV'),
+    kpiCard('広告→IG流入 転換率', igPerClick, 1, '%', 'IG流入÷Metaクリック', null, null, '広告をクリックした人のうち\n実際に楽天ショップへ流入した割合。\n計算：IG→楽天流入数 ÷ Meta広告クリック数 × 100'),
+    kpiCard('Meta CPC', tClicks > 0 ? Math.round(tBudget/tClicks) : null, 0, '¥', `目標¥${settings.targetCpc}↓`, v => v <= settings.targetCpc ? 'ok' : v <= settings.targetCpc*1.33 ? 'warn' : 'bad', null, 'Meta広告クリック単価\n計算：Meta消化予算 ÷ クリック数\n出所：Meta広告マネージャ CSV'),
   ].join('');
+
+  // ① 総合判定カード ＋ ② 次にすべきこと（総合ROASを使用）
+  renderCorrelationSummary(roasTotal, ctr, tIg, tAllBudget);
 }
 
 function kpiCard(label, value, decimals, unit, target, colorFn, wow, tip) {
@@ -957,6 +1230,88 @@ function kpiCard(label, value, decimals, unit, target, colorFn, wow, tip) {
     </div>
     ${target ? `<div class="kpi-target">${target}</div>` : ''}
   </div>`;
+}
+
+// ─────────────────────────────────────────────
+// ① 総合判定カード ＋ ② 次にすべきこと（相関分析タブ）
+// ─────────────────────────────────────────────
+function renderCorrelationSummary(roas, ctr, tIg, tBudget) {
+  const verdictEl  = document.getElementById('corr-verdict');
+  const actionsEl  = document.getElementById('corr-actions');
+  if (!verdictEl || !actionsEl) return;
+
+  // ── ① 判定ロジック ──
+  function judge(val, good, ok) {
+    if (val == null) return { emoji:'⚪', cls:'na', text:'データなし' };
+    if (val >= good) return { emoji:'🟢', cls:'good', text:'良好' };
+    if (val >= ok)   return { emoji:'🟡', cls:'warn', text:'要注意' };
+    return               { emoji:'🔴', cls:'bad',  text:'要改善' };
+  }
+  const roasJ = judge(roas,  settings.targetRoas, settings.targetRoas*0.5);
+  const ctrJ  = judge(ctr,   settings.targetCtr,  settings.targetCtr*0.67);
+  const igJ   = judge(tIg > 0 ? tIg : null, settings.targetIg, settings.targetIg*0.4);
+
+  const vCard = (cls, label, val, status, hint) => `
+    <div class="verdict-card ${cls}">
+      <div class="verdict-dot"></div>
+      <div class="verdict-body">
+        <div class="verdict-label">${label}</div>
+        <div class="verdict-val">${val}</div>
+        <div class="verdict-status">${status}<span class="verdict-hint" style="margin-left:6px;">${hint}</span></div>
+      </div>
+    </div>`;
+  verdictEl.innerHTML =
+    vCard(roasJ.cls, '広告ROAS（総合）', roas != null ? roas.toLocaleString()+'%' : '—', roasJ.text, `目標${settings.targetRoas.toLocaleString()}%`) +
+    vCard(ctrJ.cls,  'CTR（Meta広告）',  ctr  != null ? ctr.toFixed(2)+'%'          : '—', ctrJ.text,  `目標${settings.targetCtr}%`) +
+    vCard(igJ.cls,   'IG→楽天 流入',     tIg  >  0    ? tIg.toLocaleString()+'人'   : '—', igJ.text,   `目標${settings.targetIg.toLocaleString()}人/月`);
+
+  // ── ② 次にすべきこと ──
+  const actions = [];
+  const hasAd = tBudget > 0;
+
+  if (!hasAd) {
+    actions.push({ icon:'📥', text:'Meta広告CSVを取り込むと、広告効果の分析ができるようになります。' });
+  } else {
+    // ROAS判定
+    if (roas == null) {
+      actions.push({ icon:'📥', text:'楽天売上CSVを取り込むと、ROASが計算できます。' });
+    } else if (roas >= settings.targetRoas) {
+      actions.push({ icon:'✅', text:`ROAS ${roas.toLocaleString()}% — 広告効果は良好です。このまま継続し、予算を増やすことも検討できます。` });
+    } else if (roas >= settings.targetRoas * 0.5) {
+      actions.push({ icon:'⚠️', text:`ROAS ${roas.toLocaleString()}% — 広告費は回収できていますが目標（${settings.targetRoas.toLocaleString()}%）未達。効果が出た日・期間のクリエイティブを確認し、同じ内容で再出稿しましょう。` });
+    } else {
+      actions.push({ icon:'🚨', text:`ROAS ${roas.toLocaleString()}% — 広告費に見合った売上が出ていません。一時的に予算を抑え、過去に効果があったクリエイティブに絞って配信し直しましょう。` });
+    }
+
+    // CTR判定
+    if (ctr != null) {
+      if (ctr < settings.targetCtr * 0.67) {
+        actions.push({ icon:'🎨', text:`CTR ${ctr.toFixed(2)}% — 広告は表示されているがクリックされていません。画像・キャプション・ターゲット設定を見直しましょう。` });
+      } else if (ctr < settings.targetCtr) {
+        actions.push({ icon:'🔍', text:`CTR ${ctr.toFixed(2)}% — クリック率がやや低め（目標${settings.targetCtr}%）。パフォーマンスが高かった日の投稿を参考に、クリエイティブのA/Bテストを試してみましょう。` });
+      } else {
+        actions.push({ icon:'👍', text:`CTR ${ctr.toFixed(2)}% — 広告クリック率は良好。今のクリエイティブは引き続き使えます。` });
+      }
+    }
+
+    // IG流入判定
+    if (tIg <= 0) {
+      actions.push({ icon:'📝', text:'IG→楽天 流入データが未入力です。「IG・サーチ流入入力」から数値を入れると、広告との相関が分析できます。' });
+    } else if (tIg < settings.targetIg * 0.4) {
+      actions.push({ icon:'📸', text:`IG流入 ${tIg.toLocaleString()}人 — 少ない状態です。投稿へのリンク導線（プロフィールURL・ストーリーズ・QRコード）を増やしましょう。` });
+    } else if (tIg < settings.targetIg) {
+      actions.push({ icon:'📈', text:`IG流入 ${tIg.toLocaleString()}人 — 増加中ですが月間目標${settings.targetIg.toLocaleString()}人まであと${(settings.targetIg - tIg).toLocaleString()}人。投稿頻度を上げるか、広告でリーチを広げましょう。` });
+    } else {
+      actions.push({ icon:'🎉', text:`IG流入 ${tIg.toLocaleString()}人 — 目標達成！次は流入後の購入率を上げるため、楽天ページの写真・説明文の改善も検討しましょう。` });
+    }
+  }
+
+  actionsEl.innerHTML = `
+    <div class="corr-actions-box">
+      <div class="corr-actions-title">📋 次にすべきこと</div>
+      ${actions.map(a => `<div class="corr-action-item"><span class="corr-action-icon">${a.icon}</span><span>${a.text}</span></div>`).join('')}
+    </div>
+  `;
 }
 
 // ─────────────────────────────────────────────
@@ -989,11 +1344,11 @@ function getMonthlyData() {
     if (!ym) return;
     if (!byMonth[ym]) byMonth[ym] = {
       sales:0, visitors:0, igVisitors:0, searchVisitors:0,
-      extVisitors:0, intVisitors:0, clicks:0, adImp:0, budget:0,
+      extVisitors:0, intVisitors:0, clicks:0, adImp:0, budget:0, rppBudget:0, rppExpBudget:0,
       ctrSum:0, ctrN:0, cpcSum:0, cpcN:0, freqSum:0, freqN:0
     };
     const m = byMonth[ym];
-    ['sales','visitors','igVisitors','searchVisitors','extVisitors','intVisitors','clicks','adImp','budget'].forEach(k => {
+    ['sales','visitors','igVisitors','searchVisitors','extVisitors','intVisitors','clicks','adImp','budget','rppBudget','rppExpBudget'].forEach(k => {
       if (e[k] != null) m[k] += Number(e[k]);
     });
     if (e.ctr  != null) { m.ctrSum  += Number(e.ctr);  m.ctrN++;  }
@@ -1007,7 +1362,7 @@ function getMonthlyData() {
       sales: m.sales || null, visitors: m.visitors || null,
       igVisitors: m.igVisitors || null, searchVisitors: m.searchVisitors || null,
       extVisitors: m.extVisitors || null, intVisitors: m.intVisitors || null,
-      clicks: m.clicks || null, adImp: m.adImp || null, budget: m.budget || null,
+      clicks: m.clicks || null, adImp: m.adImp || null, budget: m.budget || null, rppBudget: m.rppBudget || null, rppExpBudget: m.rppExpBudget || null,
       ctr:  m.ctrN  ? parseFloat((m.ctrSum  / m.ctrN).toFixed(2))  : null,
       cpc:  m.cpcN  ? Math.round(m.cpcSum  / m.cpcN)                : null,
       freq: m.freqN ? parseFloat((m.freqSum / m.freqN).toFixed(2)) : null,
@@ -1074,11 +1429,11 @@ function renderCharts() {
   // 広告
   makeChart('chart-ctr', 'line', [
     { label:'CTR(%)', data: d.map(e=>e.ctr||null), borderColor:'#26A69A', backgroundColor:'rgba(38,166,154,0.08)', tension:0.3, fill:true },
-    targetLine('目標1.5%', 1.5, '#FFB74D'),
+    targetLine(`目標${settings.targetCtr}%`, settings.targetCtr, '#FFB74D'),
   ]);
   makeChart('chart-cpc', 'line', [
     { label:'CPC(¥)', data: d.map(e=>e.cpc||null), borderColor:'#EF5350', backgroundColor:'rgba(239,83,80,0.08)', tension:0.3, fill:true },
-    targetLine('目標¥30', 30, '#FFB74D'),
+    targetLine(`目標¥${settings.targetCpc}`, settings.targetCpc, '#FFB74D'),
   ]);
   makeChart('chart-clicks', 'bar', [
     { label:'クリック数', data: d.map(e=>e.clicks||null), backgroundColor:'rgba(121,134,203,0.7)', yAxisID:'y' },
@@ -1103,21 +1458,106 @@ function renderCharts() {
 
   // ── 広告×売上 相関チャート ──
   const roasData = d.map(e => {
-    const s = Number(e.sales)||0, b = Number(e.budget)||0;
+    const s = Number(e.sales)||0;
+    const b = (Number(e.budget)||0) + (Number(e.rppBudget)||0) + (Number(e.rppExpBudget)||0); // Meta+RPP+RPP拡張合計
     return (s > 0 && b >= 100) ? Math.round(s / b * 100) : null; // 広告費¥100未満の日は除外
   });
-  makeChart('chart-sales-vs-clicks', 'bar', [
-    { label:'売上(¥)', data: d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.6)', yAxisID:'y' },
-    { label:'広告クリック', type:'line', data: d.map(e=>e.clicks||null), borderColor:'#7986CB', backgroundColor:'rgba(121,134,203,0.08)', tension:0.3, yAxisID:'y1', pointRadius:3, fill:true },
-  ], { scales: { ...CHART_DEFAULTS.scales,
-    y:  { grid:{color:'#F0F0F0'}, ticks:{font:{size:11}, callback:v=>'¥'+v.toLocaleString()} },
-    y1: { position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:11}}, title:{display:true,text:'クリック数',font:{size:10}} }
-  }});
 
-  makeChart('chart-roas', 'line', [
-    { label:'ROAS(%)', data: roasData, borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true, pointRadius:4 },
-    targetLine('目標1000%', 1000, '#FFB74D'),
-  ]);
+  // ③ カレンダーイベントをグラフに重ね表示するカスタムプラグイン
+  const chartLabels = l; // 現在のラベル配列（MM-DD or YYYY-MM）
+  function getOverlapEvents(chartDates) {
+    if (!calEventsCache || !chartDates.length) return [];
+    const minD = chartDates[0].date, maxD = chartDates[chartDates.length-1].date;
+    return calEventsCache.filter(ev => ev.start <= maxD && (ev.end || ev.start) >= minD);
+  }
+  function makeEventPlugin(chartDates) {
+    const evs = getOverlapEvents(chartDates);
+    return {
+      id: 'calEventLines',
+      afterDraw(chart) {
+        if (!evs.length) return;
+        const ctx = chart.ctx;
+        const { top, bottom } = chart.chartArea;
+        const meta = chart.getDatasetMeta(0);
+        if (!meta.data.length) return;
+        evs.forEach(ev => {
+          const startLabel = chartPeriod === 'month' ? ev.start?.slice(0,7) : ev.start?.slice(5);
+          const idx = chartLabels.indexOf(startLabel);
+          if (idx < 0) return;
+          const bar = meta.data[idx];
+          if (!bar) return;
+          const x = bar.x;
+          ctx.save();
+          ctx.strokeStyle = ev.color || '#FF6F00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 3]);
+          ctx.globalAlpha = 0.65;
+          ctx.beginPath();
+          ctx.moveTo(x, top);
+          ctx.lineTo(x, bottom);
+          ctx.stroke();
+          ctx.globalAlpha = 0.9;
+          ctx.setLineDash([]);
+          ctx.fillStyle = ev.color || '#FF6F00';
+          ctx.font = 'bold 9px sans-serif';
+          ctx.textAlign = 'left';
+          const label = ev.title.length > 8 ? ev.title.slice(0, 8) + '…' : ev.title;
+          ctx.fillText(label, x + 3, top + 13);
+          ctx.restore();
+        });
+      }
+    };
+  }
+
+  // イベント凡例を更新する関数
+  function renderEventLegend(legendId, chartDates) {
+    const el = document.getElementById(legendId);
+    if (!el) return;
+    const evs = getOverlapEvents(chartDates);
+    if (!evs.length) { el.innerHTML = ''; return; }
+    el.innerHTML = evs.map(ev =>
+      `<span class="corr-event-badge" style="background:${ev.color||'#888'}">${ev.title} (${ev.start.slice(5)}〜${(ev.end||ev.start).slice(5)})</span>`
+    ).join('');
+  }
+
+  // chart-sales-vs-clicks（イベント重ね）
+  if (charts['chart-sales-vs-clicks']) charts['chart-sales-vs-clicks'].destroy();
+  {
+    const ctx2 = document.getElementById('chart-sales-vs-clicks')?.getContext('2d');
+    if (ctx2) {
+      charts['chart-sales-vs-clicks'] = new Chart(ctx2, {
+        type: 'bar',
+        data: { labels: chartLabels, datasets: [
+          { label:'売上(¥)', data: d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.6)', yAxisID:'y' },
+          { label:'広告クリック', type:'line', data: d.map(e=>e.clicks||null), borderColor:'#7986CB', backgroundColor:'rgba(121,134,203,0.08)', tension:0.3, yAxisID:'y1', pointRadius:3, fill:true },
+        ]},
+        options: { ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales,
+          y:  { grid:{color:'#F0F0F0'}, ticks:{font:{size:11}, callback:v=>'¥'+v.toLocaleString()} },
+          y1: { position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:11}}, title:{display:true,text:'クリック数',font:{size:10}} }
+        }},
+        plugins: [makeEventPlugin(d)]
+      });
+    }
+    renderEventLegend('legend-sales-vs-clicks', d);
+  }
+
+  // chart-roas（イベント重ね）
+  if (charts['chart-roas']) charts['chart-roas'].destroy();
+  {
+    const ctx3 = document.getElementById('chart-roas')?.getContext('2d');
+    if (ctx3) {
+      charts['chart-roas'] = new Chart(ctx3, {
+        type: 'line',
+        data: { labels: chartLabels, datasets: [
+          { label:'ROAS(%)', data: roasData, borderColor:'#FF7043', backgroundColor:'rgba(255,112,67,0.08)', tension:0.3, fill:true, pointRadius:4 },
+          targetLine(`目標${settings.targetRoas.toLocaleString()}%`, settings.targetRoas, '#FFB74D'),
+        ]},
+        options: { ...CHART_DEFAULTS },
+        plugins: [makeEventPlugin(d)]
+      });
+    }
+    renderEventLegend('legend-roas', d);
+  }
 
   // 散布図：IG流入 vs 売上
   const scatterData = d
@@ -1379,11 +1819,11 @@ function saveEntry() {
   };
   if (!entry.date) return alert('日付を入力してください');
 
-  // 同日があれば上書き（既存フィールドを保持しつつフォーム入力値で更新）
+  // 同日があれば上書き
   const idx = entries.findIndex(e => e.date === entry.date);
   if (idx >= 0) {
     if (!confirm('同じ日付のデータがあります。上書きしますか？')) return;
-    entries[idx] = { ...entries[idx], ...entry }; // extVisitors等を保持
+    entries[idx] = entry;
   } else {
     entries.push(entry);
     entries.sort((a,b) => a.date.localeCompare(b.date));
@@ -1495,22 +1935,14 @@ function importRakutenCSV(input) {
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
-      // UTF-8 → Shift-JIS の順で試みる（楽天RMSはどちらもある）
-      let text = new TextDecoder('utf-8').decode(e.target.result);
-      let rows = parseRakutenCSV(text);
-      if (rows.length === 0) {
-        text = new TextDecoder('shift-jis').decode(e.target.result);
-        rows = parseRakutenCSV(text);
-      }
-      if (rows.length === 0) {
-        alert('有効なデータが見つかりませんでした。\n楽天RMS「データダウンロード＞店舗データ」の日別CSVを選択してください。');
-        input.value = '';
-        return;
-      }
+      const text = e.target.result;
+      const rows = parseRakutenCSV(text);
+      if (rows.length === 0) { alert('有効なデータが見つかりませんでした'); return; }
       let added = 0, updated = 0;
       rows.forEach(row => {
         const idx = entries.findIndex(en => en.date === row.date);
         if (idx >= 0) {
+          // 売上・アクセス・売上件数だけ上書き（広告・流入データは保持）
           entries[idx].sales    = row.sales;
           entries[idx].visitors = row.visitors;
           entries[idx].orders   = row.orders;
@@ -1520,20 +1952,21 @@ function importRakutenCSV(input) {
           added++;
         }
       });
+      // 修復：日付フォーマット違いの重複をマージ＋空データ行を掃除
       const beforeLen = entries.length;
-      entries = dedupeEntries(entries);
+      entries = dedupeEntries(entries);          // 2026-6-10 と 2026-06-10 を統合
       entries = entries.filter(en => !isEmptyEntry(en));
       const removed = beforeLen - entries.length;
       entries.sort((a,b) => a.date.localeCompare(b.date));
       saveEntries(entries);
       renderAll();
-      alert(`取り込み完了：${added}件追加、${updated}件更新` + (removed > 0 ? `、${removed}件の重複・空データを整理` : ''));
+      alert(`取り込み完了：${added}件追加、${updated}件更新` + (removed > 0 ? `、${removed}件の重複・空データを整理` : '') + `（「すべて」デバイスの日別データ）`);
     } catch(err) {
       alert('CSVの読み込みに失敗しました: ' + err.message);
     }
     input.value = '';
   };
-  reader.readAsArrayBuffer(file);
+  reader.readAsText(file, 'UTF-8');
 }
 
 function parseRakutenCSV(text) {
@@ -1542,8 +1975,9 @@ function parseRakutenCSV(text) {
   if (lines.length < 2) return result;
 
   // 区切り文字を自動判定（タブ or カンマ）
-  const sep = lines[0].includes('\t') ? '\t' : ',';
+  const sep = lines.some(l => l.includes('\t')) ? '\t' : ',';
 
+  // ヘッダー行からカラムインデックスを取得
   function splitLine(line) {
     if (sep === '\t') return line.split('\t').map(f => f.replace(/^"|"$/g,'').trim());
     const fields = []; let cur = '', inQ = false;
@@ -1557,11 +1991,11 @@ function parseRakutenCSV(text) {
     return fields;
   }
 
-  // ヘッダー行を自動検出（1行目が免責事項などの場合に対応）
+  // 楽天RMS CSVは先頭に免責事項・メタデータ行があるため、
+  // 「日付」と「売上金額」を両方含む行を実際のヘッダー行として探す
   let headerIdx = -1;
-  for (let i = 0; i < Math.min(lines.length, 10); i++) {
-    const f = splitLine(lines[i]);
-    if (f.some(h => h.includes('日付')) && f.some(h => h.includes('売上金額'))) {
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    if (lines[i].includes('日付') && lines[i].includes('売上金額')) {
       headerIdx = i;
       break;
     }
@@ -1571,50 +2005,26 @@ function parseRakutenCSV(text) {
   const header = splitLine(lines[headerIdx]);
   const colDate    = header.findIndex(h => h.includes('日付'));
   const colDevice  = header.findIndex(h => h.includes('デバイス'));
-  const colSales   = header.findIndex(h => h.includes('売上金額'));
-  const colOrders  = header.findIndex(h => h.includes('売上件数'));
-  const colVisitors= header.findIndex(h => h.includes('アクセス人数'));
+  const colSales   = header.findIndex(h => h === '売上金額');
+  const colOrders  = header.findIndex(h => h === '売上件数');
+  const colVisitors= header.findIndex(h => h === 'アクセス人数');
 
-  // まず「すべて」デバイス行を試みる
-  const dataLines = lines.slice(headerIdx + 1).filter(l => l.trim());
-  const hasSumRow = colDevice >= 0 && dataLines.some(l => {
-    const f = splitLine(l);
-    return (f[colDevice] ?? '').trim() === 'すべて';
-  });
-
-  // 日付ごとに集計するマップ
-  const byDate = {};
-
-  for (const line of dataLines) {
+  for (const line of lines.slice(headerIdx + 1)) {
+    if (!line.trim()) continue;
     const fields = splitLine(line);
     const dateStr = (fields[colDate] ?? '').replace(/\//g,'-').replace(/"/g,'');
     if (!/^\d{4}-\d{1,2}-\d{1,2}/.test(dateStr)) continue;
-
-    // デバイスフィルタ：「すべて」行がある場合はそれだけ、ない場合は全行を合算
-    if (colDevice >= 0) {
-      const device = (fields[colDevice] ?? '').trim();
-      if (hasSumRow && device !== 'すべて') continue;
-    }
-
-    const salesRaw  = colSales   >= 0 ? (fields[colSales]   ?? '').replace(/,/g,'') : '';
-    const accessRaw = colVisitors >= 0 ? (fields[colVisitors]?? '').replace(/,/g,'') : '';
+    const device = colDevice >= 0 ? (fields[colDevice] ?? '') : '';
+    if (colDevice >= 0 && device !== 'すべて') continue;
+    const salesRaw  = (fields[colSales]   ?? '').replace(/,/g,'');
+    const accessRaw = (fields[colVisitors]?? '').replace(/,/g,'');
     if (salesRaw === '' && accessRaw === '') continue;
-
-    const dateNorm = dateStr.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_,y,m,d) =>
-      `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
-    const sales   = Number(salesRaw)  || 0;
-    const visitors= Number(accessRaw) || 0;
-    const orders  = colOrders >= 0 ? (Number((fields[colOrders] ?? '').replace(/,/g,'')) || 0) : 0;
-
-    if (!byDate[dateNorm]) byDate[dateNorm] = { sales:0, visitors:0, orders:0 };
-    byDate[dateNorm].sales    += sales;
-    byDate[dateNorm].visitors += visitors;
-    byDate[dateNorm].orders   += orders;
+    const dateNorm = dateStr.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_,y,m,d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
+    const sales    = Number(salesRaw)  || 0;
+    const visitors = Number(accessRaw) || 0;
+    const orders   = Number((fields[colOrders] ?? '').replace(/,/g,'')) || 0;
+    result.push({ date: dateNorm, sales, visitors, orders });
   }
-
-  Object.keys(byDate).sort().forEach(date => {
-    result.push({ date, ...byDate[date] });
-  });
   return result;
 }
 
@@ -1632,61 +2042,52 @@ document.getElementById('ig-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('ig-modal')) closeIgModal();
 });
 
-function onIgPeriodChange() {
-  const val = document.getElementById('ig-days-select').value;
-  const customDiv = document.getElementById('ig-custom-range');
-  if (val === 'custom') {
-    customDiv.style.display = 'flex';
-    // デフォルトで30日前をセット
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    const el = document.getElementById('ig-start-date');
-    if (!el.value) el.value = toDateStr(d);
-  } else {
-    customDiv.style.display = 'none';
-  }
-  renderIgRows();
-}
-
 function getIgDateRange() {
-  const val = document.getElementById('ig-days-select').value;
+  const sel = document.getElementById('ig-days-select').value;
   const today = new Date();
-  if (val === 'custom') {
-    const start = document.getElementById('ig-start-date').value;
-    if (!start) return [];
+  const wrap = document.getElementById('ig-custom-date-wrap');
+  if (sel === 'custom') {
+    wrap.style.display = 'flex';
+    const startStr = document.getElementById('ig-custom-start').value;
+    if (!startStr) return [];
+    const start = new Date(startStr + 'T00:00:00');
     const dates = [];
-    const cur = new Date(start);
-    while (cur <= today) {
-      dates.push(toDateStr(new Date(cur)));
-      cur.setDate(cur.getDate() + 1);
+    for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+      dates.push(toDateStr(new Date(d)));
+    }
+    return dates;
+  } else {
+    wrap.style.display = 'none';
+    const days = parseInt(sel);
+    const dates = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      dates.push(toDateStr(d));
     }
     return dates;
   }
-  const days = parseInt(val);
-  const dates = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    dates.push(toDateStr(d));
-  }
-  return dates;
 }
 
 function renderIgRows() {
   const dates = getIgDateRange();
   const container = document.getElementById('ig-rows');
-  const rows = [];
-  for (const dateStr of dates) {
-    const d = new Date(dateStr);
+  if (dates.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;font-size:12px;padding:8px 0;">開始日を選択してください</div>';
+    return;
+  }
+  const rows = dates.map(dateStr => {
+    const d = new Date(dateStr + 'T00:00:00');
     const ex = entries.find(e => e.date === dateStr);
-    rows.push({
+    return {
       dateStr,
       weekday: d.toLocaleDateString('ja-JP', { weekday: 'short' }),
-      extVal: ex?.extVisitors  ?? '',
-      intVal: ex?.intVisitors  ?? '',
-      igVal:  ex?.igVisitors   ?? '',
+      extVal: ex?.extVisitors    ?? '',
+      intVal: ex?.intVisitors    ?? '',
+      igVal:  ex?.igVisitors     ?? '',
       srVal:  ex?.searchVisitors ?? '',
-    });
-  }
+    };
+  });
   const inp = (id, val) => `<input type="number" id="${id}" value="${val}" placeholder="—"
     style="width:100%;border:1px solid #E0E0E0;border-radius:6px;padding:6px 6px;font-size:12px;text-align:right;">`;
   container.innerHTML = rows.map(r => `
@@ -1813,8 +2214,17 @@ function openReport() {
   const monthlyVisitors = monthly.reduce((s,e) => s + (Number(e.visitors)||0), 0);
   const monthlyIg       = monthly.reduce((s,e) => s + (Number(e.igVisitors)||0), 0);
   const monthlyFollower = monthly.reduce((s,e) => s + (Number(e.follower)||0), 0);
+  const monthlyMetaBudget  = monthly.reduce((s,e) => s + (Number(e.budget)||0), 0);
+  const monthlyRppBudget   = monthly.reduce((s,e) => s + (Number(e.rppBudget)||0), 0);
+  const monthlyRppExpBudget= monthly.reduce((s,e) => s + (Number(e.rppExpBudget)||0), 0);
+  const monthlyTotalAd     = monthlyMetaBudget + monthlyRppBudget + monthlyRppExpBudget;
+  const monthlyRoas        = (monthlySales>0 && monthlyTotalAd>0) ? Math.round(monthlySales/monthlyTotalAd*100) : null;
+  const monthlyRoasMeta    = (monthlySales>0 && monthlyMetaBudget>0) ? Math.round(monthlySales/monthlyMetaBudget*100) : null;
+  const monthlyRoasRakuten = (monthlySales>0 && (monthlyRppBudget+monthlyRppExpBudget)>0) ? Math.round(monthlySales/(monthlyRppBudget+monthlyRppExpBudget)*100) : null;
   const avgCtr = monthly.filter(e=>e.ctr).length ? (monthly.reduce((s,e)=>s+(Number(e.ctr)||0),0)/monthly.filter(e=>e.ctr).length).toFixed(2) : '—';
   const avgCpc = monthly.filter(e=>e.cpc).length ? Math.round(monthly.reduce((s,e)=>s+(Number(e.cpc)||0),0)/monthly.filter(e=>e.cpc).length) : '—';
+  const roasCls = r => r==null?'':r>=settings.targetRoas?'ok':r>=settings.targetRoas*0.5?'warn':'bad';
+  const roasVal = r => r==null?'—':`${r.toLocaleString()}%`;
 
   const { insights, warns, actions } = generateInsights(d, monthly, monthlySales, monthlyVisitors, monthlyIg, avgCtr, avgCpc);
   const insightHtml = [
@@ -1852,6 +2262,7 @@ function openReport() {
 
   /* KPIグリッド */
   .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:18px; }
+  .kpi-grid .span2 { grid-column: span 2; }
   .kpi-box { border:1px solid #E0E0E0; border-radius:8px; padding:10px 12px; }
   .kpi-box.accent { background:#2D2D2D; color:#fff; border-color:#2D2D2D; }
   .kpi-box.accent .kl { color:#aaa; }
@@ -1913,25 +2324,40 @@ function openReport() {
         <div class="kv">¥${monthlySales.toLocaleString()}</div>
         <div class="ks">楽天店舗カルテより</div>
       </div>
+      <div class="kpi-box ${roasCls(monthlyRoas)}">
+        <div class="kl">総合ROAS（目標${settings.targetRoas}%）</div>
+        <div class="kv">${roasVal(monthlyRoas)}</div>
+        <div class="ks">売上÷(Meta+RPP+RPP-EXP)</div>
+      </div>
       <div class="kpi-box">
-        <div class="kl">平均CTR（広告）</div>
+        <div class="kl">Meta ROAS</div>
+        <div class="kv">${roasVal(monthlyRoasMeta)}</div>
+        <div class="ks">売上÷Meta広告費</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">楽天広告 ROAS</div>
+        <div class="kv">${roasVal(monthlyRoasRakuten)}</div>
+        <div class="ks">売上÷(RPP+RPP-EXP)</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">広告費合計（今月）</div>
+        <div class="kv">¥${monthlyTotalAd.toLocaleString()}</div>
+        <div class="ks">Meta ¥${monthlyMetaBudget.toLocaleString()} / RPP ¥${(monthlyRppBudget+monthlyRppExpBudget).toLocaleString()}</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">平均CTR（目標${settings.targetCtr}%）</div>
         <div class="kv">${avgCtr}${avgCtr!=='—'?'%':''}</div>
         <div class="ks">Meta広告マネージャ</div>
       </div>
       <div class="kpi-box">
-        <div class="kl">平均CPC（広告）</div>
+        <div class="kl">平均CPC（目標¥${settings.targetCpc}）</div>
         <div class="kv">${avgCpc!=='—'?'¥':''}${avgCpc}</div>
         <div class="ks">Meta広告マネージャ</div>
       </div>
       <div class="kpi-box">
-        <div class="kl">Instagram→楽天 流入</div>
+        <div class="kl">Instagram→楽天 流入（目標${settings.targetIg}人）</div>
         <div class="kv">${monthlyIg.toLocaleString()}人</div>
         <div class="ks">楽天RMS 参照元分析</div>
-      </div>
-      <div class="kpi-box">
-        <div class="kl">広告クリック数（今月）</div>
-        <div class="kv">${monthlyClicks.toLocaleString()}回</div>
-        <div class="ks">Meta広告マネージャ</div>
       </div>
       <div class="kpi-box">
         <div class="kl">楽天 全体アクセス</div>
@@ -1944,9 +2370,9 @@ function openReport() {
         <div class="ks">Meta Business Suite</div>
       </div>
       <div class="kpi-box">
-        <div class="kl">最新CTR</div>
-        <div class="kv">${latest.ctr!=null?latest.ctr+'%':'—'}</div>
-        <div class="ks">${latest.date||''}</div>
+        <div class="kl">広告クリック数（今月）</div>
+        <div class="kv">${monthlyClicks.toLocaleString()}回</div>
+        <div class="ks">Meta広告マネージャ</div>
       </div>
     </div>
   </div>
@@ -1963,12 +2389,18 @@ function openReport() {
   <div class="section">
     <div class="section-title">📣 広告パフォーマンス</div>
     <div class="chart-row">
+      <div class="chart-box full">
+        <div class="chart-label">ROAS推移（目標${settings.targetRoas}%）― Meta / 楽天(RPP+EXP) / 総合</div>
+        <canvas id="r-roas" height="60"></canvas>
+      </div>
+    </div>
+    <div class="chart-row">
       <div class="chart-box">
-        <div class="chart-label">CTR推移（目標1.5%）</div>
+        <div class="chart-label">CTR推移（目標${settings.targetCtr}%）</div>
         <canvas id="r-ctr" height="90"></canvas>
       </div>
       <div class="chart-box">
-        <div class="chart-label">CPC推移（目標¥30）</div>
+        <div class="chart-label">CPC推移（目標¥${settings.targetCpc}）</div>
         <canvas id="r-cpc" height="90"></canvas>
       </div>
     </div>
@@ -1992,9 +2424,10 @@ function openReport() {
 
   <!-- データ出典 -->
   <div style="margin-top:auto;padding-top:16px;border-top:1px solid #EBEBEB;font-size:10px;color:#aaa;display:flex;gap:20px;flex-wrap:wrap;">
-    <span>📣 広告データ：Meta広告マネージャ</span>
-    <span>🛒 売上・全体アクセス：楽天RMS 店舗カルテ（データダウンロード）</span>
-    <span>🔗 Instagram流入：楽天RMS 参照元・検索キーワード分析</span>
+    <span>📣 Meta広告：Meta広告マネージャ</span>
+    <span>📦 RPP/RPP-EXP：楽天RMS 広告レポートCSV</span>
+    <span>🛒 売上・全体アクセス：楽天RMS 店舗カルテ</span>
+    <span>🔗 Instagram流入：楽天RMS 参照元分析</span>
   </div>
 </div>
 
@@ -2016,19 +2449,27 @@ function openReport() {
         <tr>
           <th>日付</th>
           <th>CTR</th><th>CPC</th><th>クリック</th>
-          <th>売上</th><th>全体流入</th><th>IG流入</th>
+          <th>売上</th><th>Meta費</th><th>RPP費</th><th>ROAS(総合)</th><th>全体流入</th><th>IG流入</th>
         </tr>
       </thead>
       <tbody>
         ${d.map(e => {
-          const ctrTag = e.ctr==null?'':`<span class="tag ${Number(e.ctr)>=1.5?'ok':Number(e.ctr)>=1.0?'warn':'bad'}">${e.ctr}%</span>`;
-          const cpcTag = e.cpc==null?'':`<span class="tag ${Number(e.cpc)<=30?'ok':Number(e.cpc)<=40?'warn':'bad'}">¥${e.cpc}</span>`;
+          const ctrTag = e.ctr==null?'':`<span class="tag ${Number(e.ctr)>=settings.targetCtr?'ok':Number(e.ctr)>=settings.targetCtr*0.67?'warn':'bad'}">${e.ctr}%</span>`;
+          const cpcTag = e.cpc==null?'':`<span class="tag ${Number(e.cpc)<=settings.targetCpc?'ok':Number(e.cpc)<=settings.targetCpc*1.33?'warn':'bad'}">¥${e.cpc}</span>`;
+          const metaB = Number(e.budget)||0;
+          const rppB  = (Number(e.rppBudget)||0) + (Number(e.rppExpBudget)||0);
+          const totalB = metaB + rppB;
+          const eRoas = (e.sales && totalB) ? Math.round(Number(e.sales)/totalB*100) : null;
+          const roasTag = eRoas==null?'—':`<span class="tag ${eRoas>=settings.targetRoas?'ok':eRoas>=settings.targetRoas*0.5?'warn':'bad'}">${eRoas.toLocaleString()}%</span>`;
           return `<tr>
             <td>${e.date}</td>
             <td>${ctrTag||'—'}</td>
             <td>${cpcTag||'—'}</td>
             <td>${e.clicks!=null?Number(e.clicks).toLocaleString()+'回':'—'}</td>
             <td>${e.sales!=null?'¥'+Number(e.sales).toLocaleString():'—'}</td>
+            <td>${metaB?'¥'+metaB.toLocaleString():'—'}</td>
+            <td>${rppB?'¥'+rppB.toLocaleString():'—'}</td>
+            <td>${roasTag}</td>
             <td>${e.visitors!=null?Number(e.visitors).toLocaleString()+'人':'—'}</td>
             <td>${e.igVisitors!=null?Number(e.igVisitors).toLocaleString()+'人':'—'}</td>
           </tr>`;
@@ -2047,15 +2488,19 @@ function openReport() {
 
   <!-- データ出典 -->
   <div style="margin-top:auto;padding-top:16px;border-top:1px solid #EBEBEB;font-size:10px;color:#aaa;display:flex;gap:20px;flex-wrap:wrap;">
-    <span>📣 広告データ：Meta広告マネージャ</span>
-    <span>🛒 売上・全体アクセス：楽天RMS 店舗カルテ（データダウンロード）</span>
-    <span>🔗 Instagram流入：楽天RMS 参照元・検索キーワード分析</span>
+    <span>📣 Meta広告：Meta広告マネージャ</span>
+    <span>📦 RPP/RPP-EXP：楽天RMS 広告レポートCSV</span>
+    <span>🛒 売上・全体アクセス：楽天RMS 店舗カルテ</span>
+    <span>🔗 Instagram流入：楽天RMS 参照元分析</span>
   </div>
 </div>
 
 <script>
 const d = ${toJson(d)};
 const labels = ${toJson(labels)};
+const tRoas = ${settings.targetRoas};
+const tCtr  = ${settings.targetCtr};
+const tCpc  = ${settings.targetCpc};
 const opt = {
   responsive:true,
   plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } },
@@ -2064,19 +2509,28 @@ const opt = {
     y:{ grid:{color:'#F5F5F5'}, ticks:{font:{size:9}} }
   }
 };
-function target(val,color){ return { label:'目標', data:d.map(()=>val), borderColor:color, borderDash:[3,3], borderWidth:1, pointRadius:0 }; }
+function target(val,color,lbl){ return { label:lbl||'目標', data:d.map(()=>val), borderColor:color, borderDash:[3,3], borderWidth:1, pointRadius:0 }; }
 
 new Chart(document.getElementById('r-sales'),{ type:'bar', data:{ labels, datasets:[
   { label:'売上(¥)', data:d.map(e=>e.sales||null), backgroundColor:'rgba(38,166,154,0.7)', yAxisID:'y' },
   { label:'IG流入', type:'line', data:d.map(e=>e.igVisitors||null), borderColor:'#FF7043', tension:0.3, yAxisID:'y1', pointRadius:3 },
 ]}, options:{...opt, scales:{...opt.scales, y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:9}}}}} });
 
+new Chart(document.getElementById('r-roas'),{ type:'line', data:{ labels, datasets:[
+  { label:'総合ROAS(%)', data:d.map(e=>{ const b=(Number(e.budget)||0)+(Number(e.rppBudget)||0)+(Number(e.rppExpBudget)||0); return (e.sales&&b)?Math.round(Number(e.sales)/b*100):null; }), borderColor:'#6C63FF', tension:0.3, backgroundColor:'rgba(108,99,255,0.08)', fill:true, pointRadius:3 },
+  { label:'Meta ROAS(%)', data:d.map(e=>{ const b=Number(e.budget)||0; return (e.sales&&b)?Math.round(Number(e.sales)/b*100):null; }), borderColor:'#26A69A', tension:0.3, pointRadius:2, borderDash:[4,2] },
+  { label:'楽天 ROAS(%)', data:d.map(e=>{ const b=(Number(e.rppBudget)||0)+(Number(e.rppExpBudget)||0); return (e.sales&&b)?Math.round(Number(e.sales)/b*100):null; }), borderColor:'#EF5350', tension:0.3, pointRadius:2, borderDash:[4,2] },
+  target(tRoas,'#999','目標'),
+]}, options:opt });
+
 new Chart(document.getElementById('r-ctr'),{ type:'line', data:{ labels, datasets:[
   { label:'CTR(%)', data:d.map(e=>e.ctr||null), borderColor:'#26A69A', tension:0.3, backgroundColor:'rgba(38,166,154,0.08)', fill:true },
+  target(tCtr,'#999'),
 ]}, options:opt });
 
 new Chart(document.getElementById('r-cpc'),{ type:'line', data:{ labels, datasets:[
   { label:'CPC(¥)', data:d.map(e=>e.cpc||null), borderColor:'#EF5350', tension:0.3, backgroundColor:'rgba(239,83,80,0.08)', fill:true },
+  target(tCpc,'#999'),
 ]}, options:opt });
 
 <\/script>
@@ -2096,10 +2550,7 @@ function toggleGuide() {
 }
 
 function toDateStr(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return d.toISOString().slice(0,10);
 }
 
 // ─────────────────────────────────────────────
@@ -2152,55 +2603,213 @@ function seedAndSave() {
 // ─────────────────────────────────────────────
 // Meta広告CSVインポート
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// RPP CSVインポート
+// ─────────────────────────────────────────────
+function importRPPCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const rows = parseRPPCSV(e.target.result);
+      if (rows.length === 0) { alert('有効なRPPデータが見つかりませんでした'); return; }
+      let added = 0, updated = 0;
+      rows.forEach(row => {
+        const idx = entries.findIndex(en => en.date === row.date);
+        if (idx >= 0) {
+          entries[idx].rppBudget = row.rppBudget;
+          entries[idx].rppClicks = row.rppClicks;
+          updated++;
+        } else {
+          entries.push({ date: row.date, rppBudget: row.rppBudget, rppClicks: row.rppClicks });
+          added++;
+        }
+      });
+      entries.sort((a,b) => a.date.localeCompare(b.date));
+      saveEntries(entries);
+      renderAll();
+      alert(`RPP取り込み完了：${added}件追加、${updated}件更新`);
+    } catch(err) {
+      alert('RPP CSVの読み込みに失敗しました: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file, 'Shift-JIS');
+}
+
+function parseRPPCSV(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // ヘッダー行を探す（日付 + 実績額(合計) を含む行）
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    if (lines[i].includes('日付') && lines[i].includes('実績額')) {
+      headerIdx = i; break;
+    }
+  }
+  if (headerIdx < 0) return [];
+
+  // CSVをカンマ区切りでパース（クォート対応）
+  function splitCSV(line) {
+    const fields = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    fields.push(cur.trim());
+    return fields;
+  }
+
+  const header = splitCSV(lines[headerIdx]).map(h => h.replace(/"/g,'').trim());
+  const dateIdx   = header.findIndex(h => h === '日付');
+  const spendIdx  = header.findIndex(h => h === '実績額(合計)');
+  const clickIdx  = header.findIndex(h => h === 'クリック数(合計)');
+  if (dateIdx < 0 || spendIdx < 0) return [];
+
+  const result = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = splitCSV(lines[i]).map(c => c.replace(/"/g,'').trim());
+    if (!cols[dateIdx]) continue;
+    // 日付変換: "2026年06月01日" → "2026-06-01"
+    const dateStr = cols[dateIdx].replace(/(\d{4})年(\d{2})月(\d{2})日/, '$1-$2-$3');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+    const spend  = parseFloat(cols[spendIdx]) || 0;
+    const clicks = parseInt(cols[clickIdx])   || 0;
+    if (spend > 0) result.push({ date: dateStr, rppBudget: spend, rppClicks: clicks });
+  }
+  return result;
+}
+
+// ─────────────────────────────────────────────
+// RPPエクスパンション CSVインポート（UTF-8 BOM付き）
+// ─────────────────────────────────────────────
+function importRPPExpCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const rows = parseRPPExpCSV(e.target.result);
+      if (rows.length === 0) { alert('有効なRPP拡張データが見つかりませんでした'); return; }
+      let added = 0, updated = 0;
+      rows.forEach(row => {
+        const idx = entries.findIndex(en => en.date === row.date);
+        if (idx >= 0) {
+          entries[idx].rppExpBudget = row.rppExpBudget;
+          updated++;
+        } else {
+          entries.push({ date: row.date, rppExpBudget: row.rppExpBudget });
+          added++;
+        }
+      });
+      entries.sort((a,b) => a.date.localeCompare(b.date));
+      saveEntries(entries);
+      renderAll();
+      alert(`RPP拡張取り込み完了：${added}件追加、${updated}件更新`);
+    } catch(err) {
+      alert('RPP拡張 CSVの読み込みに失敗しました: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseRPPExpCSV(text) {
+  // BOM除去
+  const cleaned = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    if (lines[i].includes('日付') && lines[i].includes('実績額')) {
+      headerIdx = i; break;
+    }
+  }
+  if (headerIdx < 0) return [];
+
+  function splitCSV(line) {
+    const fields = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    fields.push(cur.trim());
+    return fields;
+  }
+
+  const header  = splitCSV(lines[headerIdx]).map(h => h.replace(/"/g,'').trim());
+  const dateIdx = header.findIndex(h => h === '日付');
+  // RPP拡張は「実績額」（括弧なし）
+  const spendIdx = header.findIndex(h => h === '実績額');
+  if (dateIdx < 0 || spendIdx < 0) return [];
+
+  const result = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = splitCSV(lines[i]).map(c => c.replace(/"/g,'').trim());
+    if (!cols[dateIdx]) continue;
+    const dateStr = cols[dateIdx].replace(/(\d{4})年(\d{2})月(\d{2})日/, '$1-$2-$3');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+    const spend = parseFloat(cols[spendIdx]) || 0;
+    if (spend > 0) result.push({ date: dateStr, rppExpBudget: spend });
+  }
+  return result;
+}
+
 function importCSV(input) {
   const file = input.files[0];
   if (!file) return;
-  const isExcel = /\.(xlsx|xls)$/i.test(file.name);
 
-  function processMetaText(text) {
-    const rows = parseMetaCSV(text);
-    if (rows.length === 0) { alert('有効なデータが見つかりませんでした'); return; }
-    let added = 0, skipped = 0;
-    rows.forEach(row => {
-      const idx = entries.findIndex(en => en.date === row.date);
-      if (idx >= 0) {
-        Object.assign(entries[idx], row);
-        skipped++;
-      } else {
-        entries.push(row);
-        added++;
-      }
-    });
-    entries.sort((a,b) => a.date.localeCompare(b.date));
-    saveEntries(entries);
-    renderAll();
-    alert(`取り込み完了：${added}件追加、${skipped}件更新（インプレッション0の日はスキップ済み）`);
+  function processRows(csvText) {
+    try {
+      const rows = parseMetaCSV(csvText);
+      if (rows.length === 0) { alert('有効なデータが見つかりませんでした'); return; }
+      let added = 0, skipped = 0;
+      rows.forEach(row => {
+        const idx = entries.findIndex(en => en.date === row.date);
+        if (idx >= 0) {
+          const adFields = { ctr: row.ctr, cpc: row.cpc, clicks: row.clicks, adImp: row.adImp, budget: row.budget, freq: row.freq };
+          Object.assign(entries[idx], adFields);
+          skipped++;
+        } else {
+          entries.push(row);
+          added++;
+        }
+      });
+      entries.sort((a,b) => a.date.localeCompare(b.date));
+      saveEntries(entries);
+      renderAll();
+      alert(`取り込み完了：${added}件追加、${skipped}件更新（インプレッション0の日はスキップ済み）`);
+    } catch(err) {
+      alert('Meta広告データの読み込みに失敗しました: ' + err.message);
+    }
+    input.value = '';
   }
 
-  if (isExcel) {
+  const isXlsx = /\.(xlsx|xls)$/i.test(file.name);
+  if (isXlsx) {
+    // xlsxはSheetJSで読み込み、日付をYYYY-MM-DD形式でCSV化してから処理
     const reader = new FileReader();
     reader.onload = function(e) {
-      try {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const csv = XLSX.utils.sheet_to_csv(ws);
-        processMetaText(csv);
-      } catch(err) {
-        alert('Excelの読み込みに失敗しました: ' + err.message);
-      }
-      input.value = '';
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // raw:false + dateNF で日付を文字列に統一
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+      const csv = aoa.map(row => (row || []).map(cell => {
+        if (cell === null || cell === undefined) return '';
+        const s = String(cell);
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+      }).join(',')).join('\n');
+      processRows(csv);
     };
     reader.readAsArrayBuffer(file);
   } else {
     const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        processMetaText(e.target.result);
-      } catch(err) {
-        alert('CSVの読み込みに失敗しました: ' + err.message);
-      }
-      input.value = '';
-    };
+    reader.onload = function(e) { processRows(e.target.result); };
     reader.readAsText(file, 'UTF-8');
   }
 }
@@ -2243,6 +2852,10 @@ function parseMetaCSV(text) {
   const colBudget = findCol('消化金額');
   const colReach  = findCol('リーチ');
   const colFreq   = findCol('フリークエンシー');
+  // デバッグ用（列が見つからない場合に警告）
+  if (colDate < 0 || colImp < 0 || colBudget < 0) {
+    console.warn('Meta CSV列マッピング:', { colDate, colImp, colClicks, colBudget, colReach, colFreq, header });
+  }
 
   // 日付の正規化：YYYY/M/D または YYYY-M-D → YYYY-MM-DD
   function normalizeDate(d) {
@@ -2279,8 +2892,8 @@ function parseMetaCSV(text) {
     const ctr  = v.adImp > 0 ? parseFloat((v.clicks / v.adImp * 100).toFixed(2)) : null;
     const cpc  = v.clicks > 0 ? Math.round(v.budget / v.clicks) : null;
     const freq = v.freqN  > 0 ? parseFloat((v.freqSum / v.freqN).toFixed(2)) : null;
-    // 広告データのみ（手入力フィールドを上書きしないよう null フィールドは含めない）
-    result.push({ date, ctr, cpc, clicks: v.clicks, adImp: v.adImp, budget: Math.round(v.budget), freq });
+    result.push({ date, ctr, cpc, clicks: v.clicks, adImp: v.adImp, budget: Math.round(v.budget), freq,
+      reach:null, imp:null, engage:null, saves:null, follower:null, profile:null, sales:null, visitors:null, igVisitors:null });
   });
   return result;
 }
@@ -2581,16 +3194,6 @@ function deleteCalEvent(id) {
   if (calSelectedDate) renderCalDetail(calSelectedDate);
 }
 
-function deleteCurrentCalEvent() {
-  if (!calEditId) return;
-  if (!confirm('このイベントを削除しますか？')) return;
-  const arr = loadCalEvents().filter(e => e.id !== calEditId);
-  saveCalEvents(arr);
-  closeCalModal();
-  renderCalendar();
-  if (calSelectedDate) renderCalDetail(calSelectedDate);
-}
-
 let calEditId = null;
 
 function editCalEvent(id) {
@@ -2605,16 +3208,16 @@ function editCalEvent(id) {
   document.getElementById('cal-ev-time-end').value   = ev.timeEnd   || '';
   document.getElementById('cal-ev-note').value       = ev.note      || '';
   document.querySelector('#cal-modal h2').textContent = '✏️ イベントを編集';
-  document.getElementById('cal-del-btn').style.display = 'inline-block';
   document.getElementById('cal-save-btn').textContent = '保存する';
+  document.getElementById('cal-del-btn').style.display = 'inline-block';
   document.getElementById('cal-modal').style.display = 'flex';
 }
 
 function openCalAddModal() {
   calEditId = null;
   document.querySelector('#cal-modal h2').textContent = '📅 イベントを追加';
-  document.getElementById('cal-del-btn').style.display = 'none';
   document.getElementById('cal-save-btn').textContent = '追加する';
+  document.getElementById('cal-del-btn').style.display = 'none';
   document.getElementById('cal-ev-start').value = calSelectedDate || toDateStr(new Date());
   document.getElementById('cal-ev-end').value        = calSelectedDate || toDateStr(new Date());
   document.getElementById('cal-ev-title').value      = '';
@@ -2629,6 +3232,17 @@ function openCalAddModal() {
 }
 function closeCalModal() {
   document.getElementById('cal-modal').style.display = 'none';
+  calEditId = null;
+}
+
+function deleteCurrentCalEvent() {
+  if (!calEditId) return;
+  if (!confirm('このイベントを削除しますか？')) return;
+  const arr = loadCalEvents().filter(e => e.id !== calEditId);
+  saveCalEvents(arr);
+  closeCalModal();
+  renderCalendar();
+  if (calSelectedDate) renderCalDetail(calSelectedDate);
 }
 function saveCalEvent() {
   const start     = document.getElementById('cal-ev-start').value;
