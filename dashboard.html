@@ -3334,6 +3334,7 @@ function moveGanttGroup(catKey, title, dir) {
 
 // 期間ボタン（chartPeriod）に応じてガントの表示範囲を決定
 function getGanttRange(events) {
+  const today = new Date();
   const monthDim = new Date(calYear, calMonth + 1, 0).getDate();
   const monthRange = [`${calYear}-${ganttPad(calMonth+1)}-01`, `${calYear}-${ganttPad(calMonth+1)}-${ganttPad(monthDim)}`];
 
@@ -3345,14 +3346,12 @@ function getGanttRange(events) {
   }
   if (!events.length) return monthRange;
 
-  const sorted = events.slice().sort((a,b)=> a.start < b.start ? -1 : a.start > b.start ? 1 : 0);
-  let subset = sorted;
-  if (chartPeriod === 10 || chartPeriod === '10') subset = sorted.slice(-10);
-  else if (chartPeriod === 30 || chartPeriod === '30') subset = sorted.slice(-30);
-  // 'all' は全件
-  const start = subset.reduce((m,e)=> e.start < m ? e.start : m, subset[0].start);
-  const end   = subset.reduce((m,e)=> e.end   > m ? e.end   : m, subset[0].end);
-  return [start, end];
+  // 'all' および数値系: 本日基準で今月頭〜翌月末を表示
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const rangeStart = ganttFmt(new Date(y, m, 1));     // 今月1日
+  const rangeEnd   = ganttFmt(new Date(y, m + 2, 0)); // 翌月末
+  return [rangeStart, rangeEnd];
 }
 
 function renderGantt() {
