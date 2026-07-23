@@ -796,6 +796,7 @@ function roboTalk() {
         <option value="rakuten">🛒 楽天</option>
         <option value="coupon">🎫 クーポン</option>
         <option value="point">⭐ ポイントアップ</option>
+        <option value="rpp">💙 RPP</option>
         <option value="ad">📣 広告</option>
       </select>
     </div>
@@ -3539,7 +3540,7 @@ function renderGantt() {
   if (grouped) {
     CAT_META.forEach(meta => {
       const evs = inRange.filter(e => e.cat === meta.key);
-      if (evs.length > 0) html += catBlock(meta, evs, meta.key);
+      html += catBlock(meta, evs, meta.key);
     });
     const known = CAT_META.map(m => m.key);
     const others = inRange.filter(e => !known.includes(e.cat));
