@@ -494,6 +494,7 @@
       <button class="cal-filter-btn" data-cat="rakuten" onclick="setCalFilter('rakuten')">🛒 楽天</button>
       <button class="cal-filter-btn" data-cat="coupon" onclick="setCalFilter('coupon')">🎫 クーポン</button>
       <button class="cal-filter-btn" data-cat="point" onclick="setCalFilter('point')">⭐ ポイントアップ</button>
+      <button class="cal-filter-btn" data-cat="rpp" onclick="setCalFilter('rpp')">💙 RPP</button>
       <button class="cal-filter-btn" data-cat="ad" onclick="setCalFilter('ad')">📣 広告</button>
     </div>
     <div class="cal-legend" id="cal-legend">
@@ -1087,7 +1088,7 @@ function renderEvents() {
     return;
   }
 
-  const CAT_ICON = { rakuten:'🛒', coupon:'🎫', point:'⭐', ad:'📣' };
+  const CAT_ICON = { rakuten:'🛒', coupon:'🎫', point:'⭐', rpp:'💙', ad:'📣' };
 
   items.forEach(({ ev, type, diff }) => {
     let badge = '';
@@ -2905,6 +2906,7 @@ const CAT_COLOR = {
   rakuten: '#BF0000',
   coupon:  '#43A047',
   point:   '#8E24AA',
+  rpp:     '#0288D1',
   ad:      '#F57C00',
   sale:    '#BF0000',
   marathon:'#0050B3',
@@ -3364,6 +3366,7 @@ function renderGantt() {
     { key:'rakuten', label:'楽天',        color:CAT_COLOR.rakuten },
     { key:'coupon',  label:'クーポン',     color:CAT_COLOR.coupon  },
     { key:'point',   label:'ポイントアップ', color:CAT_COLOR.point   },
+    { key:'rpp',     label:'RPP',          color:CAT_COLOR.rpp     },
     { key:'ad',      label:'広告',         color:CAT_COLOR.ad       },
   ];
 
