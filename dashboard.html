@@ -182,7 +182,7 @@
     .cal-view-btn.active { background:#fff; color:#2D2D2D; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
 
     /* ── Gantt ── */
-    .gantt-wrap { background:#fff; border:1px solid #EBEBEB; border-radius:12px; overflow:hidden; }
+    .gantt-wrap { background:#fff; border:1px solid #EBEBEB; border-radius:12px; overflow:hidden; padding-bottom:2px; }
     .gantt-scroll { overflow-x:auto; }
     .gantt-inner { min-width:max-content; }
     .gantt-row { display:flex; border-top:1px solid #F0F0F0; }
@@ -277,9 +277,46 @@
       <span id="today-label" style="font-size:12px;"></span>
       <span id="last-updated-label" style="font-size:11px;color:#aaa;"></span>
     </div>
+    <button onclick="toggleHeaderPanel('panel-guide')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:8px;color:#ddd;font-size:12px;cursor:pointer;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">📋 データ取得先</button>
+    <button onclick="toggleHeaderPanel('panel-events')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:8px;color:#ddd;font-size:12px;cursor:pointer;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">📅 今後の予定 <span id="events-count" style="color:#aaa;"></span></button>
     <a href="./manual.html" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">📖 マニュアル</a>
   </div>
 </header>
+
+<!-- ヘッダードロップダウンパネル -->
+<div id="panel-guide" style="display:none;background:#fff;border-bottom:2px solid #E0E0E0;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;position:relative;">
+  <div style="max-width:960px;margin:0 auto;padding:16px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="border-bottom:1px solid #F0F0F0;">
+          <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;width:30%;">データ</th>
+          <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;width:35%;">取得場所</th>
+          <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;">出し方</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #F5F5F5;">
+          <td style="padding:8px 6px;font-weight:600;">📣 広告（CTR・CPC等）</td>
+          <td style="padding:8px 6px;">Meta広告マネージャ<br><a href="https://adsmanager.facebook.com/" target="_blank" style="font-size:11px;color:#7986CB;">→ 広告マネージャを開く</a></td>
+          <td style="padding:8px 6px;color:#555;">「キャンペーン」→「内訳」→「日」→「エクスポート」<br><span style="color:#7986CB;font-weight:600;">→ そのままCSV取り込みボタンでOK</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid #F5F5F5;">
+          <td style="padding:8px 6px;font-weight:600;">🛒 売上・楽天流入</td>
+          <td style="padding:8px 6px;">楽天RMS データダウンロード</td>
+          <td style="padding:8px 6px;color:#555;">「6 データダウンロード」→「店舗データ」→ 日次・期間選択 → CSVダウンロード<br><span style="color:#BF0000;font-weight:600;">→ 楽天店舗データCSV取り込みボタンでOK</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px;padding:10px 12px;background:#F0F4FF;border-radius:8px;font-size:12px;color:#555;line-height:1.7;">
+      ⏰ <strong>入力タイミング：週1〜2回</strong>でOK。広告・売上はCSV取込。アクセス内訳（楽天外・楽天内・サーチ・IG流入）は手入力。
+    </div>
+  </div>
+</div>
+<div id="panel-events" style="display:none;background:#fff;border-bottom:2px solid #E0E0E0;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;position:relative;">
+  <div style="max-width:960px;margin:0 auto;padding:16px;">
+    <div id="event-list" style=""></div>
+  </div>
+</div>
 
 <div class="container">
 
@@ -325,52 +362,10 @@
     </div>
   </div>
 
-  <!-- データ取得ガイド -->
-  <details style="margin-top:14px;background:#fff;border:1px solid #EBEBEB;border-radius:10px;overflow:hidden;">
-    <summary style="padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
-      📋 どこからデータを取るか <span style="font-size:11px;color:#aaa;font-weight:400;">（クリックで開く）</span>
-    </summary>
-    <div style="padding:0 16px 16px;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead>
-          <tr style="border-bottom:1px solid #F0F0F0;">
-            <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;width:30%;">データ</th>
-            <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;width:35%;">取得場所</th>
-            <th style="text-align:left;padding:8px 6px;color:#888;font-weight:700;">出し方</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style="border-bottom:1px solid #F5F5F5;">
-            <td style="padding:8px 6px;font-weight:600;">📣 広告（CTR・CPC等）</td>
-            <td style="padding:8px 6px;">Meta広告マネージャ<br><a href="https://adsmanager.facebook.com/" target="_blank" style="font-size:11px;color:#7986CB;">→ 広告マネージャを開く</a></td>
-            <td style="padding:8px 6px;color:#555;">「キャンペーン」→「内訳」→「日」→「エクスポート」<br><span style="color:#7986CB;font-weight:600;">→ そのままCSV取り込みボタンでOK</span></td>
-          </tr>
-          <tr style="border-bottom:1px solid #F5F5F5;">
-            <td style="padding:8px 6px;font-weight:600;">🛒 売上・楽天流入</td>
-            <td style="padding:8px 6px;">楽天RMS データダウンロード</td>
-            <td style="padding:8px 6px;color:#555;">「6 データダウンロード」→「店舗データ」→ 日次・期間選択 → CSVダウンロード<br><span style="color:#BF0000;font-weight:600;">→ 楽天店舗データCSV取り込みボタンでOK</span></td>
-          </tr>
-        </tbody>
-      </table>
-      <div style="margin-top:10px;padding:10px 12px;background:#F0F4FF;border-radius:8px;font-size:12px;color:#555;line-height:1.7;">
-        ⏰ <strong>入力タイミング：週1〜2回</strong>でOK。広告・売上はCSV取込。アクセス内訳（楽天外・楽天内・サーチ・IG流入）は手入力。
-      </div>
-    </div>
-  </details>
-
-  <!-- ② 予定 -->
-  <details id="events-details" style="margin-top:16px;background:#fff;border:1px solid #EBEBEB;border-radius:10px;overflow:hidden;">
-    <summary id="events-summary" style="padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
-      <span>📅 今後の予定 <span id="events-count" style="font-size:11px;color:#aaa;font-weight:400;"></span></span>
-      <span style="font-size:11px;color:#aaa;font-weight:400;">（クリックで開く）</span>
-    </summary>
-    <div id="event-list" style="padding:0 16px 10px;"></div>
-  </details>
-
   <!-- ③ データタブ -->
   <div class="tabs">
-    <div class="tab" onclick="switchTab('calendar')">📅 カレンダー</div>
-    <div class="tab active" onclick="switchTab('sales')">🛒 売上・アクセス</div>
+    <div class="tab active" onclick="switchTab('calendar')">📅 カレンダー</div>
+    <div class="tab" onclick="switchTab('sales')">🛒 売上・アクセス</div>
     <div class="tab" onclick="switchTab('ad')">📣 インスタ広告</div>
     <div class="tab" onclick="switchTab('correlation')">📊 相関分析</div>
     <div class="tab" onclick="switchTab('history')">📋 履歴</div>
@@ -428,7 +423,7 @@
   </div>
 
   <!-- 売上タブ -->
-  <div class="tab-content active" id="tab-sales">
+  <div class="tab-content" id="tab-sales">
     <div class="kpi-period" id="kpi-sales-period"></div>
     <div class="kpi-row" id="kpi-sales"></div>
     <div class="chart-wrap">
@@ -484,7 +479,7 @@
   </div>
 
   <!-- カレンダータブ -->
-  <div class="tab-content" id="tab-calendar">
+  <div class="tab-content active" id="tab-calendar">
     <div class="cal-view-toggle">
       <button class="cal-view-btn" id="view-btn-calendar" onclick="setCalView('calendar')">📅 カレンダー</button>
       <button class="cal-view-btn active" id="view-btn-gantt" onclick="setCalView('gantt')">📊 ガントチャート</button>
@@ -806,6 +801,7 @@ function roboTalk() {
     </div>
     <div class="modal-footer">
       <button id="cal-del-btn" onclick="deleteCurrentCalEvent()" style="display:none;background:none;border:1px solid #E53935;color:#E53935;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;">🗑 削除</button>
+      <button id="cal-dup-btn" onclick="duplicateCalEvent()" style="display:none;background:none;border:1px solid #1976D2;color:#1976D2;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;">📋 複製</button>
       <div style="flex:1;"></div>
       <button class="btn-cancel" onclick="closeCalModal()">キャンセル</button>
       <button class="btn-save" id="cal-save-btn" onclick="saveCalEvent()">追加する</button>
@@ -1881,6 +1877,15 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
 }
 
+function toggleHeaderPanel(id) {
+  const panels = ['panel-guide', 'panel-events'];
+  panels.forEach(p => {
+    if (p !== id) document.getElementById(p).style.display = 'none';
+  });
+  const el = document.getElementById(id);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 // ─────────────────────────────────────────────
 // ユーティリティ
 // ─────────────────────────────────────────────
@@ -2850,7 +2855,7 @@ function parseMetaCSV(text) {
   }
   const colDate   = findCol('レポート開始日', 'レポート開始', 'Date');
   const colImp    = findCol('インプレッション');
-  const colClicks = findCol('リンククリック数', 'リンククリック');
+  const colClicks = findCol('リンクのクリック数', 'リンククリック数', 'リンクのクリック', 'リンククリック', 'クリック（全て）', 'クリック(全て)');
   const colBudget = findCol('消化金額');
   const colReach  = findCol('リーチ');
   const colFreq   = findCol('フリークエンシー');
@@ -3213,6 +3218,7 @@ function editCalEvent(id) {
   document.querySelector('#cal-modal h2').textContent = '✏️ イベントを編集';
   document.getElementById('cal-save-btn').textContent = '保存する';
   document.getElementById('cal-del-btn').style.display = 'inline-block';
+  document.getElementById('cal-dup-btn').style.display = 'inline-block';
   document.getElementById('cal-modal').style.display = 'flex';
 }
 
@@ -3221,6 +3227,7 @@ function openCalAddModal() {
   document.querySelector('#cal-modal h2').textContent = '📅 イベントを追加';
   document.getElementById('cal-save-btn').textContent = '追加する';
   document.getElementById('cal-del-btn').style.display = 'none';
+  document.getElementById('cal-dup-btn').style.display = 'none';
   document.getElementById('cal-ev-start').value = calSelectedDate || toDateStr(new Date());
   document.getElementById('cal-ev-end').value        = calSelectedDate || toDateStr(new Date());
   document.getElementById('cal-ev-title').value      = '';
@@ -3236,6 +3243,18 @@ function openCalAddModal() {
 function closeCalModal() {
   document.getElementById('cal-modal').style.display = 'none';
   calEditId = null;
+}
+
+function duplicateCalEvent() {
+  // タイトル・カテゴリ・時間・メモはそのまま、日付だけクリアして新規追加モードに
+  calEditId = null;
+  document.querySelector('#cal-modal h2').textContent = '📋 イベントを複製';
+  document.getElementById('cal-save-btn').textContent = '追加する';
+  document.getElementById('cal-del-btn').style.display = 'none';
+  document.getElementById('cal-dup-btn').style.display = 'none';
+  document.getElementById('cal-ev-start').value = '';
+  document.getElementById('cal-ev-end').value = '';
+  document.getElementById('cal-ev-start').focus();
 }
 
 function deleteCurrentCalEvent() {
