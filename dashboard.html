@@ -279,6 +279,7 @@
     </div>
     <button onclick="toggleHeaderPanel('panel-guide')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:8px;color:#ddd;font-size:12px;cursor:pointer;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">📋 データ取得先</button>
     <button onclick="toggleHeaderPanel('panel-events')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:8px;color:#ddd;font-size:12px;cursor:pointer;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">📅 今後の予定 <span id="events-count" style="color:#aaa;"></span></button>
+    <button onclick="toggleHeaderPanel('panel-log')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:8px;color:#ddd;font-size:12px;cursor:pointer;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">📝 更新ログ</button>
     <a href="./manual.html" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">📖 マニュアル</a>
   </div>
 </header>
@@ -315,6 +316,11 @@
 <div id="panel-events" style="display:none;background:#fff;border-bottom:2px solid #E0E0E0;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;position:relative;">
   <div style="max-width:960px;margin:0 auto;padding:16px;">
     <div id="event-list" style=""></div>
+  </div>
+</div>
+<div id="panel-log" style="display:block;background:#fff;border-bottom:2px solid #E0E0E0;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;position:relative;">
+  <div style="max-width:960px;margin:0 auto;padding:12px 16px;">
+    <div id="update-log-list" style="font-size:12px;color:#555;"></div>
   </div>
 </div>
 
@@ -570,13 +576,31 @@
 
 </div><!-- /container -->
 
-<!-- ぴょこぴょこロボ -->
-<div id="robo-wrap" style="position:fixed;bottom:24px;right:24px;z-index:200;cursor:pointer;user-select:none;" onclick="roboTalk()" title="クリックしてね">
+<!-- ぴょこぴょこロボ（メモ機能統合） -->
+<div id="robo-wrap" style="position:fixed;bottom:24px;right:24px;z-index:200;user-select:none;">
+  <!-- ランダム発言吹き出し -->
   <div id="robo-bubble" style="display:none;position:absolute;bottom:80px;right:0;background:#2D2D2D;color:#fff;font-size:12px;font-weight:600;padding:8px 12px;border-radius:10px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
     <span id="robo-text"></span>
     <div style="position:absolute;bottom:-6px;right:18px;width:10px;height:10px;background:#2D2D2D;transform:rotate(45deg);"></div>
   </div>
-  <div id="robo" style="font-size:42px;animation:roboBounce 1.8s ease-in-out infinite;">🤖</div>
+  <!-- メモ吹き出し -->
+  <div id="memo-bubble" style="display:none;position:absolute;bottom:80px;right:0;background:#fff;border:1.5px solid #E0E0E0;border-radius:14px;padding:12px 14px;width:240px;box-shadow:0 4px 16px rgba(0,0,0,0.15);">
+    <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:6px;">📌 メモ</div>
+    <div id="robot-bubble-text" style="font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-all;min-height:20px;"></div>
+    <div id="memo-edit-area" style="display:none;margin-top:8px;">
+      <textarea id="robot-memo-input" rows="3" style="width:100%;border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;font-size:13px;resize:none;outline:none;box-sizing:border-box;" placeholder="メモを入力…"></textarea>
+      <div style="display:flex;gap:6px;margin-top:5px;">
+        <button onclick="saveMemo()" style="flex:1;background:#1976D2;color:#fff;border:none;border-radius:6px;padding:5px 0;font-size:12px;cursor:pointer;font-weight:600;">保存</button>
+        <button onclick="cancelMemoEdit()" style="flex:1;background:#F5F5F5;color:#555;border:none;border-radius:6px;padding:5px 0;font-size:12px;cursor:pointer;">キャンセル</button>
+      </div>
+    </div>
+    <button id="robot-edit-btn" onclick="openMemoEdit()" style="margin-top:8px;display:block;width:100%;background:#F5F5F5;border:none;border-radius:6px;padding:4px 0;font-size:12px;color:#555;cursor:pointer;">✏️ 編集</button>
+    <!-- 吹き出し三角 -->
+    <div style="position:absolute;bottom:-9px;right:20px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:9px solid #E0E0E0;"></div>
+    <div style="position:absolute;bottom:-7px;right:21px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:8px solid #fff;"></div>
+  </div>
+  <!-- ロボット本体 -->
+  <div id="robo" style="font-size:42px;animation:roboBounce 1.8s ease-in-out infinite;cursor:pointer;text-align:center;" onclick="toggleMemoBubble()" title="メモを見る / 話しかける">🤖</div>
 </div>
 <style>
   @keyframes roboBounce {
@@ -929,6 +953,8 @@ const DATA_DOC = db.collection('dashboard').doc('main');
 let entries = [];
 let events  = [];
 let calEventsCache = [];
+let updateLogCache = [];
+let memoCache = '';
 let charts  = {};
 let dbReady = false;
 
@@ -997,6 +1023,8 @@ DATA_DOC.onSnapshot(doc => {
   entries        = data.entries        || [];
   events         = data.events         || [];
   calEventsCache = data.calEvents      || [];
+  updateLogCache = data.updateLog      || [];
+  memoCache      = data.memo           || '';
   customCatColors = data.catColors   || {};
   titleColors     = data.titleColors || {};
   if (data.settings) Object.assign(settings, data.settings);
@@ -1041,6 +1069,8 @@ function init() {
   // モーダルのデフォルト日付
   document.getElementById('entry-date').value = toDateStr(today);
 
+  renderUpdateLog();
+  renderMemo();
   renderEvents();
   renderKPIs();
   renderCharts();
@@ -1773,6 +1803,8 @@ function deleteEntry(idx) {
 }
 
 function renderAll() {
+  renderUpdateLog();
+  renderMemo();
   renderEvents();
   renderKPIs();
   renderCharts();
@@ -1878,12 +1910,14 @@ function switchTab(name) {
 }
 
 function toggleHeaderPanel(id) {
-  const panels = ['panel-guide', 'panel-events'];
+  const panels = ['panel-guide', 'panel-events', 'panel-log'];
   panels.forEach(p => {
     if (p !== id) document.getElementById(p).style.display = 'none';
   });
   const el = document.getElementById(id);
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  const opening = el.style.display === 'none';
+  el.style.display = opening ? 'block' : 'none';
+  if (opening && id === 'panel-log') renderUpdateLog();
 }
 
 // ─────────────────────────────────────────────
@@ -2981,10 +3015,55 @@ function updateCatColor(cat, color) {
 function loadCalEvents() {
   return calEventsCache;
 }
-function saveCalEvents(arr) {
+function saveCalEvents(arr, description) {
   calEventsCache = arr;
   DATA_DOC.set({ calEvents: arr }, { merge: true });
+  appendUpdateLog(description || `カレンダー更新（${arr.length}件）`);
 }
+
+// ─── 更新ログ ───────────────────────────────────
+
+function appendUpdateLog(description) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const entry = { ts, desc: description, id: 'log' + Date.now() };
+  // 最大20件保持
+  const logs = [entry, ...updateLogCache].slice(0, 20);
+  updateLogCache = logs;
+  DATA_DOC.set({ updateLog: logs }, { merge: true });
+  // パネルが開いていれば更新
+  if (document.getElementById('panel-log').style.display !== 'none') renderUpdateLog();
+}
+
+function deleteUpdateLog(id) {
+  updateLogCache = updateLogCache.filter(e => e.id !== id);
+  DATA_DOC.set({ updateLog: updateLogCache }, { merge: true });
+  renderUpdateLog();
+}
+
+function renderUpdateLog(showAll) {
+  const el = document.getElementById('update-log-list');
+  if (!el) return;
+  if (updateLogCache.length === 0) {
+    el.innerHTML = '<span style="color:#aaa;font-size:12px;">まだ更新ログはありません</span>';
+    return;
+  }
+  const visible = showAll ? updateLogCache : updateLogCache.slice(0, 3);
+  const rows = visible.map(e => `
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #F5F5F5;">
+      <span style="color:#888;min-width:130px;font-size:12px;">${e.ts}</span>
+      <span style="flex:1;font-size:12px;">${e.desc || (e.count != null ? `カレンダー更新（${e.count}件）` : '更新')}</span>
+      <button onclick="deleteUpdateLog('${e.id}')" style="background:none;border:1px solid #E53935;color:#E53935;border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;">削除</button>
+    </div>
+  `).join('');
+  const moreBtn = (!showAll && updateLogCache.length > 3)
+    ? `<button onclick="renderUpdateLog(true)" style="margin-top:6px;background:none;border:none;color:#1976D2;font-size:12px;cursor:pointer;">▼ もっと見る（${updateLogCache.length - 3}件）</button>`
+    : (showAll && updateLogCache.length > 3 ? `<button onclick="renderUpdateLog(false)" style="margin-top:6px;background:none;border:none;color:#999;font-size:12px;cursor:pointer;">▲ 閉じる</button>` : '');
+  el.innerHTML = rows + moreBtn;
+}
+
+const CAT_LABEL = { rakuten:'楽天イベント', coupon:'クーポン', point:'ポイント', rpp:'RPP', ad:'広告' };
 
 function seedCalEvents() {
   // calEventsCache はonSnapshot or seedAndSave で設定済み
@@ -3196,8 +3275,11 @@ function renderCalDetail(dateStr) {
 
 function deleteCalEvent(id) {
   if (!confirm('このイベントを削除しますか？')) return;
+  const ev = loadCalEvents().find(e => e.id === id);
+  const catName = ev && (typeof CAT_LABEL !== 'undefined' && CAT_LABEL[ev.cat]) || (ev && ev.cat) || '';
+  const desc = ev ? `🗑 削除：「${ev.title}」（${catName}）` : '🗑 イベントを削除';
   const arr = loadCalEvents().filter(e => e.id !== id);
-  saveCalEvents(arr);
+  saveCalEvents(arr, desc);
   renderCalendar();
   if (calSelectedDate) renderCalDetail(calSelectedDate);
 }
@@ -3246,22 +3328,24 @@ function closeCalModal() {
 }
 
 function duplicateCalEvent() {
-  // タイトル・カテゴリ・時間・メモはそのまま、日付だけクリアして新規追加モードに
+  // タイトル・カテゴリ・日付・時間・メモすべてそのままで新規追加モードに
   calEditId = null;
   document.querySelector('#cal-modal h2').textContent = '📋 イベントを複製';
   document.getElementById('cal-save-btn').textContent = '追加する';
   document.getElementById('cal-del-btn').style.display = 'none';
   document.getElementById('cal-dup-btn').style.display = 'none';
-  document.getElementById('cal-ev-start').value = '';
-  document.getElementById('cal-ev-end').value = '';
-  document.getElementById('cal-ev-start').focus();
+  // 日付はそのまま保持（フォーカスはタイトルへ）
+  document.getElementById('cal-ev-title').focus();
 }
 
 function deleteCurrentCalEvent() {
   if (!calEditId) return;
   if (!confirm('このイベントを削除しますか？')) return;
+  const ev = loadCalEvents().find(e => e.id === calEditId);
+  const catName = ev && (typeof CAT_LABEL !== 'undefined' && CAT_LABEL[ev.cat]) || (ev && ev.cat) || '';
+  const desc = ev ? `🗑 削除：「${ev.title}」（${catName}）` : '🗑 イベントを削除';
   const arr = loadCalEvents().filter(e => e.id !== calEditId);
-  saveCalEvents(arr);
+  saveCalEvents(arr, desc);
   closeCalModal();
   renderCalendar();
   if (calSelectedDate) renderCalDetail(calSelectedDate);
@@ -3276,13 +3360,17 @@ function saveCalEvent() {
   const note      = document.getElementById('cal-ev-note').value.trim();
   if (!start || !title) { alert('開始日とタイトルを入力してください'); return; }
   const arr = loadCalEvents();
+  const catName = (typeof CAT_LABEL !== 'undefined' && CAT_LABEL[cat]) || cat;
+  let desc;
   if (calEditId) {
     const idx = arr.findIndex(e => e.id === calEditId);
     if (idx !== -1) arr[idx] = { ...arr[idx], start, end: end || start, title, cat, color: getCatColor(cat), timeStart, timeEnd, note };
+    desc = `✏️ 編集：「${title}」（${catName}）`;
   } else {
     arr.push({ id: 'u' + Date.now(), start, end: end || start, title, cat, color: getCatColor(cat), timeStart, timeEnd, note });
+    desc = `➕ 追加：「${title}」（${catName}）`;
   }
-  saveCalEvents(arr);
+  saveCalEvents(arr, desc);
   closeCalModal();
   renderCalendar();
   if (calSelectedDate) renderCalDetail(calSelectedDate);
@@ -3585,8 +3673,57 @@ function selectGanttEvent(id) {
 
 // ─────────────────────────────────────────────
 // 起動（Firestoreのonsnapshotで自動実行）
+// ─── ロボットメモ ───────────────────────────────
+function renderMemo() {
+  const bubble = document.getElementById('robot-bubble-text');
+  const editBtn = document.getElementById('robot-edit-btn');
+  if (!bubble) return;
+  bubble.textContent = memoCache || 'メモはありません';
+  bubble.style.color = memoCache ? '#333' : '#aaa';
+}
+
+function toggleMemoBubble() {
+  const memo = document.getElementById('memo-bubble');
+  const talk = document.getElementById('robo-bubble');
+  const robo = document.getElementById('robo');
+  if (memo.style.display !== 'none') {
+    memo.style.display = 'none';
+    return;
+  }
+  talk.style.display = 'none';
+  memo.style.display = 'block';
+  robo.style.animation = 'roboWiggle 0.4s ease-in-out 3';
+  setTimeout(() => { robo.style.animation = 'roboBounce 1.8s ease-in-out infinite'; }, 1400);
+}
+
+function openMemoEdit() {
+  const input = document.getElementById('robot-memo-input');
+  const editArea = document.getElementById('memo-edit-area');
+  const editBtn = document.getElementById('robot-edit-btn');
+  input.value = memoCache;
+  editArea.style.display = 'block';
+  editBtn.style.display = 'none';
+  input.focus();
+}
+
+function saveMemo() {
+  const input = document.getElementById('robot-memo-input');
+  memoCache = input.value.trim();
+  DATA_DOC.set({ memo: memoCache }, { merge: true });
+  document.getElementById('memo-edit-area').style.display = 'none';
+  document.getElementById('robot-edit-btn').style.display = 'block';
+  renderMemo();
+}
+
+function cancelMemoEdit() {
+  document.getElementById('memo-edit-area').style.display = 'none';
+  document.getElementById('robot-edit-btn').style.display = 'block';
+}
+
 // ─────────────────────────────────────────────
 // init() は DATA_DOC.onSnapshot 内から呼ばれる
 </script>
+
+
 </body>
 </html>
