@@ -817,6 +817,7 @@ function roboTalk() {
         <option value="point">⭐ ポイントアップ</option>
         <option value="rpp">💙 RPP</option>
         <option value="ad">📣 広告</option>
+        <option value="insta">📸 インスタ</option>
       </select>
     </div>
     <div class="date-row">
@@ -2948,6 +2949,7 @@ const CAT_COLOR = {
   point:   '#8E24AA',
   rpp:     '#0288D1',
   ad:      '#F57C00',
+  insta:   '#C13584',
   sale:    '#BF0000',
   marathon:'#0050B3',
   thanks:  '#FFB300',
@@ -3063,7 +3065,7 @@ function renderUpdateLog(showAll) {
   el.innerHTML = rows + moreBtn;
 }
 
-const CAT_LABEL = { rakuten:'楽天イベント', coupon:'クーポン', point:'ポイント', rpp:'RPP', ad:'広告' };
+const CAT_LABEL = { rakuten:'楽天イベント', coupon:'クーポン', point:'ポイント', rpp:'RPP', ad:'広告', insta:'インスタ' };
 
 function seedCalEvents() {
   // calEventsCache はonSnapshot or seedAndSave で設定済み
