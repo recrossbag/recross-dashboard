@@ -3039,9 +3039,12 @@ function appendUpdateLog(description) {
 }
 
 function deleteUpdateLog(id) {
-  updateLogCache = updateLogCache.filter(e => e.id !== id);
-  DATA_DOC.set({ updateLog: updateLogCache }, { merge: true });
-  renderUpdateLog();
+  DATA_DOC.get().then(doc => {
+    const data = doc.data() || {};
+    const logs = (data.updateLog || []).filter(e => e.id !== id);
+    updateLogCache = logs;
+    DATA_DOC.update({ updateLog: logs }).then(() => renderUpdateLog());
+  });
 }
 
 function renderUpdateLog(showAll) {
